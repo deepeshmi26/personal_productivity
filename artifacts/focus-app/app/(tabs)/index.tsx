@@ -36,8 +36,13 @@ function useCountdown(target: Date | null) {
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { intervalMinutes, permissionGranted, requestPermission, nextReminderAt } =
-    useNotifications();
+  const {
+    intervalMinutes,
+    permissionGranted,
+    requestPermission,
+    nextReminderAt,
+    notificationsLimited,
+  } = useNotifications();
   const { data: stats } = useGetResponseStats();
   const { data: responses } = useListResponses();
   const countdown = useCountdown(nextReminderAt);
@@ -78,7 +83,32 @@ export default function HomeScreen() {
 
       <CaptureCard />
 
-      {!permissionGranted && Platform.OS !== "web" && (
+      {notificationsLimited ? (
+        <View
+          style={[
+            styles.banner,
+            {
+              backgroundColor: colors.accent,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Feather name="info" size={18} color={colors.accentForeground} />
+          <View style={{ flex: 1 }}>
+            <Text
+              style={[styles.bannerTitle, { color: colors.accentForeground }]}
+            >
+              Reminders run inside the app
+            </Text>
+            <Text
+              style={[styles.bannerBody, { color: colors.accentForeground }]}
+            >
+              Push notifications need a development build. The in-app timer and
+              capture flow work normally.
+            </Text>
+          </View>
+        </View>
+      ) : !permissionGranted ? (
         <Pressable
           onPress={requestPermission}
           style={({ pressed }) => [
@@ -110,7 +140,7 @@ export default function HomeScreen() {
             color={colors.accentForeground}
           />
         </Pressable>
-      )}
+      ) : null}
 
       <View style={styles.statsRow}>
         <StatCard

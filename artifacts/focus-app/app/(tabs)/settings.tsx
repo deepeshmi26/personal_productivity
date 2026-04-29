@@ -26,6 +26,7 @@ export default function SettingsScreen() {
     permissionGranted,
     requestPermission,
     nextReminderAt,
+    notificationsLimited,
   } = useNotifications();
   const [saving, setSaving] = useState<number | null>(null);
 
@@ -177,9 +178,11 @@ export default function SettingsScreen() {
             >
               {Platform.OS === "web"
                 ? "Notifications work best on mobile (iOS / Android)."
-                : permissionGranted
-                  ? "You'll be nudged while using your phone."
-                  : "Permission required to send reminders."}
+                : notificationsLimited
+                  ? "Push needs a development build. The in-app timer still ticks."
+                  : permissionGranted
+                    ? "You'll be nudged while using your phone."
+                    : "Permission required to send reminders."}
             </Text>
           </View>
         </View>
@@ -190,7 +193,7 @@ export default function SettingsScreen() {
               styles.statusDot,
               {
                 backgroundColor:
-                  Platform.OS === "web"
+                  Platform.OS === "web" || notificationsLimited
                     ? colors.muted
                     : permissionGranted
                       ? "#10b981"
@@ -201,11 +204,13 @@ export default function SettingsScreen() {
           <Text style={[styles.statusText, { color: colors.foreground }]}>
             {Platform.OS === "web"
               ? "Unavailable on web"
-              : permissionGranted
-                ? "Enabled"
-                : "Disabled"}
+              : notificationsLimited
+                ? "Limited in Expo Go"
+                : permissionGranted
+                  ? "Enabled"
+                  : "Disabled"}
           </Text>
-          {!permissionGranted && Platform.OS !== "web" && (
+          {!permissionGranted && !notificationsLimited && Platform.OS !== "web" && (
             <Pressable
               onPress={requestPermission}
               style={({ pressed }) => [
@@ -228,7 +233,7 @@ export default function SettingsScreen() {
           )}
         </View>
 
-        {nextReminderAt && permissionGranted && (
+        {nextReminderAt && (permissionGranted || notificationsLimited) && (
           <View
             style={[
               styles.nextRow,
