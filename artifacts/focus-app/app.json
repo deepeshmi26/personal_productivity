@@ -17,7 +17,10 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.learn5.app",
       "infoPlist": {
-        "UIBackgroundModes": ["fetch", "remote-notification"]
+        "UIBackgroundModes": [
+          "fetch",
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -26,7 +29,9 @@
         "SCHEDULE_EXACT_ALARM",
         "POST_NOTIFICATIONS",
         "RECEIVE_BOOT_COMPLETED",
-        "WAKE_LOCK"
+        "WAKE_LOCK",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.WAKE_LOCK"
       ]
     },
     "web": {
@@ -54,6 +59,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "84afc47b-226e-4fe6-b4d3-53fd797c898f"
+      }
+    },
+    "owner": "deepes.mi26"
   }
 }
