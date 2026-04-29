@@ -10,6 +10,10 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: responses
+    description: Learning responses
+  - name: settings
+    description: User settings
 paths:
   /healthz:
     get:
@@ -24,6 +28,80 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /responses:
+    get:
+      operationId: listResponses
+      tags: [responses]
+      summary: List all learning responses
+      description: Returns all responses, newest first
+      responses:
+        "200":
+          description: List of responses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LearningResponse"
+    post:
+      operationId: createResponse
+      tags: [responses]
+      summary: Create a new learning response
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateResponseRequest"
+      responses:
+        "201":
+          description: Created response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearningResponse"
+  /responses/stats:
+    get:
+      operationId: getResponseStats
+      tags: [responses]
+      summary: Get response statistics
+      description: Returns a daily breakdown of how many responses were captured
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponseStats"
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get user settings
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update user settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSettingsRequest"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +111,77 @@ components:
           type: string
       required:
         - status
-
+    LearningResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        text:
+          type: string
+          description: The user's response text, or empty string if "I don't know"
+        skipped:
+          type: boolean
+          description: True if the user tapped "I don't know"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - text
+        - skipped
+        - createdAt
+    CreateResponseRequest:
+      type: object
+      properties:
+        text:
+          type: string
+        skipped:
+          type: boolean
+      required:
+        - text
+        - skipped
+    ResponseStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        answered:
+          type: integer
+        skipped:
+          type: integer
+        days:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                description: ISO date (YYYY-MM-DD)
+              count:
+                type: integer
+            required:
+              - date
+              - count
+      required:
+        - total
+        - answered
+        - skipped
+        - days
+    Settings:
+      type: object
+      properties:
+        reminderIntervalMinutes:
+          type: integer
+          minimum: 1
+          maximum: 240
+      required:
+        - reminderIntervalMinutes
+    UpdateSettingsRequest:
+      type: object
+      properties:
+        reminderIntervalMinutes:
+          type: integer
+          minimum: 1
+          maximum: 240
+      required:
+        - reminderIntervalMinutes

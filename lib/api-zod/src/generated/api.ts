@@ -14,3 +14,74 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Returns all responses, newest first
+ * @summary List all learning responses
+ */
+export const ListResponsesResponseItem = zod.object({
+  id: zod.number(),
+  text: zod
+    .string()
+    .describe("The user's response text, or empty string if \"I don't know\""),
+  skipped: zod.boolean().describe('True if the user tapped \"I don\'t know\"'),
+  createdAt: zod.coerce.date(),
+});
+export const ListResponsesResponse = zod.array(ListResponsesResponseItem);
+
+/**
+ * @summary Create a new learning response
+ */
+export const CreateResponseBody = zod.object({
+  text: zod.string(),
+  skipped: zod.boolean(),
+});
+
+/**
+ * Returns a daily breakdown of how many responses were captured
+ * @summary Get response statistics
+ */
+export const GetResponseStatsResponse = zod.object({
+  total: zod.number(),
+  answered: zod.number(),
+  skipped: zod.number(),
+  days: zod.array(
+    zod.object({
+      date: zod.string().describe("ISO date (YYYY-MM-DD)"),
+      count: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary Get user settings
+ */
+export const getSettingsResponseReminderIntervalMinutesMax = 240;
+
+export const GetSettingsResponse = zod.object({
+  reminderIntervalMinutes: zod
+    .number()
+    .min(1)
+    .max(getSettingsResponseReminderIntervalMinutesMax),
+});
+
+/**
+ * @summary Update user settings
+ */
+export const updateSettingsBodyReminderIntervalMinutesMax = 240;
+
+export const UpdateSettingsBody = zod.object({
+  reminderIntervalMinutes: zod
+    .number()
+    .min(1)
+    .max(updateSettingsBodyReminderIntervalMinutesMax),
+});
+
+export const updateSettingsResponseReminderIntervalMinutesMax = 240;
+
+export const UpdateSettingsResponse = zod.object({
+  reminderIntervalMinutes: zod
+    .number()
+    .min(1)
+    .max(updateSettingsResponseReminderIntervalMinutesMax),
+});

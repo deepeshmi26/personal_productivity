@@ -8,3 +8,46 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface LearningResponse {
+  id: number;
+  /** The user's response text, or empty string if "I don't know" */
+  text: string;
+  /** True if the user tapped "I don't know" */
+  skipped: boolean;
+  createdAt: string;
+}
+
+export interface CreateResponseRequest {
+  text: string;
+  skipped: boolean;
+}
+
+export type ResponseStatsDaysItem = {
+  /** ISO date (YYYY-MM-DD) */
+  date: string;
+  count: number;
+};
+
+export interface ResponseStats {
+  total: number;
+  answered: number;
+  skipped: number;
+  days: ResponseStatsDaysItem[];
+}
+
+export interface Settings {
+  /**
+   * @minimum 1
+   * @maximum 240
+   */
+  reminderIntervalMinutes: number;
+}
+
+export interface UpdateSettingsRequest {
+  /**
+   * @minimum 1
+   * @maximum 240
+   */
+  reminderIntervalMinutes: number;
+}

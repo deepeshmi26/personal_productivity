@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "BL--b-70BHlReVKogQI-e"
+uri = "file://artifacts/focus-app/assets/images/icon.png"
+type = "image"
+title = "learn5 app icon"

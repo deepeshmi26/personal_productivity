@@ -6,4 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./createResponseRequest";
 export * from "./healthStatus";
+export * from "./learningResponse";
+export * from "./responseStats";
+export * from "./responseStatsDaysItem";
+export * from "./settings";
+export * from "./updateSettingsRequest";
