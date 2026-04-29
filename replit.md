@@ -24,14 +24,17 @@ A learning-capture mobile app ("Learn5") that nudges the user every few minutes 
   - `/api/responses/stats` GET — daily counts and totals
   - `/api/settings` GET / PUT — reminder interval (minutes)
 - `artifacts/focus-app` — Expo mobile app (Learn5)
-  - Tabs: Capture (home prompt), Journal (history), Settings (interval + notification status)
-  - `contexts/NotificationContext.tsx` schedules a repeating local notification every N minutes and reschedules when the app comes to the foreground (auto-detect device usage)
+  - Tabs: Capture (home prompt), Journal (history), Settings (interval, quiet hours, notification status)
+  - `contexts/NotificationContext.tsx` schedules a batch of date-triggered local notifications respecting quiet hours, listens for notification tap/dismiss to reset the timer, and registers an `expo-background-fetch` task that tops up the schedule when iOS/Android wakes the app
+  - `lib/scheduling.ts` — pure helpers for "next reminder times that skip quiet hours"
+  - `eas.json` — EAS Build profiles (`preview` produces an installable Android APK)
+  - All `expo-notifications`/`expo-background-fetch`/`expo-task-manager` calls are lazy-loaded and crash-safe so the app still runs in Expo Go (with an in-app countdown only)
 - `artifacts/mockup-sandbox` — design sandbox (unchanged scaffold)
 
 ## Database tables
 
 - `responses` — id, text, skipped, created_at
-- `settings` — singleton row holding `reminder_interval_minutes`
+- `settings` — singleton row holding `reminder_interval_minutes`, `quiet_hours_enabled`, `quiet_hours_start`, `quiet_hours_end`
 
 ## Key Commands
 

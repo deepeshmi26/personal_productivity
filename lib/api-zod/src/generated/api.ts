@@ -58,11 +58,27 @@ export const GetResponseStatsResponse = zod.object({
  */
 export const getSettingsResponseReminderIntervalMinutesMax = 240;
 
+export const getSettingsResponseQuietHoursStartRegExp = new RegExp(
+  "^([01]\\d|2[0-3]):[0-5]\\d$",
+);
+export const getSettingsResponseQuietHoursEndRegExp = new RegExp(
+  "^([01]\\d|2[0-3]):[0-5]\\d$",
+);
+
 export const GetSettingsResponse = zod.object({
   reminderIntervalMinutes: zod
     .number()
     .min(1)
     .max(getSettingsResponseReminderIntervalMinutesMax),
+  quietHoursEnabled: zod.boolean(),
+  quietHoursStart: zod
+    .string()
+    .regex(getSettingsResponseQuietHoursStartRegExp)
+    .describe("Start of quiet window in HH:mm (24h)"),
+  quietHoursEnd: zod
+    .string()
+    .regex(getSettingsResponseQuietHoursEndRegExp)
+    .describe("End of quiet window in HH:mm (24h)"),
 });
 
 /**
@@ -70,18 +86,51 @@ export const GetSettingsResponse = zod.object({
  */
 export const updateSettingsBodyReminderIntervalMinutesMax = 240;
 
+export const updateSettingsBodyQuietHoursStartRegExp = new RegExp(
+  "^([01]\\d|2[0-3]):[0-5]\\d$",
+);
+export const updateSettingsBodyQuietHoursEndRegExp = new RegExp(
+  "^([01]\\d|2[0-3]):[0-5]\\d$",
+);
+
 export const UpdateSettingsBody = zod.object({
   reminderIntervalMinutes: zod
     .number()
     .min(1)
-    .max(updateSettingsBodyReminderIntervalMinutesMax),
+    .max(updateSettingsBodyReminderIntervalMinutesMax)
+    .optional(),
+  quietHoursEnabled: zod.boolean().optional(),
+  quietHoursStart: zod
+    .string()
+    .regex(updateSettingsBodyQuietHoursStartRegExp)
+    .optional(),
+  quietHoursEnd: zod
+    .string()
+    .regex(updateSettingsBodyQuietHoursEndRegExp)
+    .optional(),
 });
 
 export const updateSettingsResponseReminderIntervalMinutesMax = 240;
+
+export const updateSettingsResponseQuietHoursStartRegExp = new RegExp(
+  "^([01]\\d|2[0-3]):[0-5]\\d$",
+);
+export const updateSettingsResponseQuietHoursEndRegExp = new RegExp(
+  "^([01]\\d|2[0-3]):[0-5]\\d$",
+);
 
 export const UpdateSettingsResponse = zod.object({
   reminderIntervalMinutes: zod
     .number()
     .min(1)
     .max(updateSettingsResponseReminderIntervalMinutesMax),
+  quietHoursEnabled: zod.boolean(),
+  quietHoursStart: zod
+    .string()
+    .regex(updateSettingsResponseQuietHoursStartRegExp)
+    .describe("Start of quiet window in HH:mm (24h)"),
+  quietHoursEnd: zod
+    .string()
+    .regex(updateSettingsResponseQuietHoursEndRegExp)
+    .describe("End of quiet window in HH:mm (24h)"),
 });

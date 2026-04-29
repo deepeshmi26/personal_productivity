@@ -11,5 +11,10 @@ export interface UpdateSettingsRequest {
    * @minimum 1
    * @maximum 240
    */
-  reminderIntervalMinutes: number;
+  reminderIntervalMinutes?: number;
+  quietHoursEnabled?: boolean;
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  quietHoursStart?: string;
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  quietHoursEnd?: string;
 }

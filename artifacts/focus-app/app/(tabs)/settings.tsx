@@ -5,6 +5,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from "react-native";
@@ -14,6 +15,7 @@ import * as Haptics from "expo-haptics";
 
 import { useColors } from "@/hooks/useColors";
 import { useNotifications } from "@/contexts/NotificationContext";
+import { TimeField } from "@/components/QuietHoursPicker";
 
 const PRESETS = [1, 3, 5, 10, 15, 30, 60];
 
@@ -23,12 +25,15 @@ export default function SettingsScreen() {
   const {
     intervalMinutes,
     setIntervalMinutes,
+    quietHours,
+    setQuietHours,
     permissionGranted,
     requestPermission,
     nextReminderAt,
     notificationsLimited,
   } = useNotifications();
   const [saving, setSaving] = useState<number | null>(null);
+  const [savingQuiet, setSavingQuiet] = useState(false);
 
   const topPad = Platform.OS === "web" ? 67 + 16 : insets.top + 8;
 
@@ -42,6 +47,17 @@ export default function SettingsScreen() {
       await setIntervalMinutes(minutes);
     } finally {
       setSaving(null);
+    }
+  };
+
+  const updateQuiet = async (
+    next: Partial<typeof quietHours>,
+  ) => {
+    setSavingQuiet(true);
+    try {
+      await setQuietHours({ ...quietHours, ...next });
+    } finally {
+      setSavingQuiet(false);
     }
   };
 
@@ -64,6 +80,7 @@ export default function SettingsScreen() {
         </Text>
       </View>
 
+      {/* Reminder interval */}
       <View
         style={[
           styles.section,
@@ -144,7 +161,7 @@ export default function SettingsScreen() {
                         },
                       ]}
                     >
-                      {m === 1 ? "min" : "min"}
+                      min
                     </Text>
                   </>
                 )}
@@ -154,6 +171,66 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      {/* Quiet hours */}
+      <View
+        style={[
+          styles.section,
+          { backgroundColor: colors.card, borderColor: colors.border },
+        ]}
+      >
+        <View style={styles.sectionHeader}>
+          <View
+            style={[
+              styles.sectionIcon,
+              { backgroundColor: colors.accent },
+            ]}
+          >
+            <Feather name="moon" size={16} color={colors.accentForeground} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+              Quiet hours
+            </Text>
+            <Text
+              style={[styles.sectionBody, { color: colors.mutedForeground }]}
+            >
+              No reminders during this window. Perfect for sleep or deep work.
+            </Text>
+          </View>
+          <Switch
+            value={quietHours.enabled}
+            onValueChange={(v) => updateQuiet({ enabled: v })}
+            trackColor={{ false: colors.muted, true: colors.primary }}
+            thumbColor={Platform.OS === "ios" ? "#fff" : undefined}
+            disabled={savingQuiet}
+          />
+        </View>
+
+        {quietHours.enabled && (
+          <View style={styles.timeRow}>
+            <TimeField
+              label="From"
+              value={quietHours.start}
+              onChange={(v) => updateQuiet({ start: v })}
+              disabled={savingQuiet}
+            />
+            <Feather
+              name="arrow-right"
+              size={16}
+              color={colors.mutedForeground}
+              style={{ marginTop: 22 }}
+            />
+            <TimeField
+              label="Until"
+              value={quietHours.end}
+              onChange={(v) => updateQuiet({ end: v })}
+              disabled={savingQuiet}
+            />
+          </View>
+        )}
+      </View>
+
+      {/* Notifications */}
       <View
         style={[
           styles.section,
@@ -181,7 +258,7 @@ export default function SettingsScreen() {
                 : notificationsLimited
                   ? "Push needs a development build. The in-app timer still ticks."
                   : permissionGranted
-                    ? "You'll be nudged while using your phone."
+                    ? "You'll be nudged on schedule. The timer resets when you tap a reminder."
                     : "Permission required to send reminders."}
             </Text>
           </View>
@@ -256,6 +333,7 @@ export default function SettingsScreen() {
         )}
       </View>
 
+      {/* How it works */}
       <View
         style={[
           styles.section,
@@ -278,10 +356,10 @@ export default function SettingsScreen() {
           </View>
         </View>
         <Text style={[styles.bodyText, { color: colors.mutedForeground }]}>
-          Learn5 watches when you open your phone and quietly schedules a
-          reminder every {intervalMinutes} minute{intervalMinutes === 1 ? "" : "s"}.
-          Each time you tap "Save" or "I don't know," the timer resets so you
-          aren't bombarded.
+          Learn5 schedules a batch of reminders every {intervalMinutes} minute
+          {intervalMinutes === 1 ? "" : "s"}, skipping over your quiet window.
+          The timer resets whenever you tap a notification, open the app, or
+          save an entry — so you're never spammed if you're already engaged.
         </Text>
       </View>
     </ScrollView>
@@ -355,6 +433,11 @@ const styles = StyleSheet.create({
   presetUnit: {
     fontFamily: "Inter_500Medium",
     fontSize: 12,
+  },
+  timeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
   statusRow: {
     flexDirection: "row",

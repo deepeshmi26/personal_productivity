@@ -42,6 +42,17 @@ export interface Settings {
    * @maximum 240
    */
   reminderIntervalMinutes: number;
+  quietHoursEnabled: boolean;
+  /**
+   * Start of quiet window in HH:mm (24h)
+   * @pattern ^([01]\d|2[0-3]):[0-5]\d$
+   */
+  quietHoursStart: string;
+  /**
+   * End of quiet window in HH:mm (24h)
+   * @pattern ^([01]\d|2[0-3]):[0-5]\d$
+   */
+  quietHoursEnd: string;
 }
 
 export interface UpdateSettingsRequest {
@@ -49,5 +60,10 @@ export interface UpdateSettingsRequest {
    * @minimum 1
    * @maximum 240
    */
-  reminderIntervalMinutes: number;
+  reminderIntervalMinutes?: number;
+  quietHoursEnabled?: boolean;
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  quietHoursStart?: string;
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  quietHoursEnd?: string;
 }

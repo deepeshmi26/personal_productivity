@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { useColors } from "@/hooks/useColors";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import type { QuietHoursConfig } from "@/lib/scheduling";
 
 export function SettingsBootstrap({ children }: { children: React.ReactNode }) {
   const colors = useColors();
@@ -33,10 +34,29 @@ export function SettingsBootstrap({ children }: { children: React.ReactNode }) {
     await queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
   };
 
+  const onQuietHoursChange = async (q: QuietHoursConfig) => {
+    await updateMutation.mutateAsync({
+      data: {
+        quietHoursEnabled: q.enabled,
+        quietHoursStart: q.start,
+        quietHoursEnd: q.end,
+      },
+    });
+    await queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
+  };
+
+  const quietHours: QuietHoursConfig = {
+    enabled: data.quietHoursEnabled,
+    start: data.quietHoursStart,
+    end: data.quietHoursEnd,
+  };
+
   return (
     <NotificationProvider
       intervalMinutes={data.reminderIntervalMinutes}
+      quietHours={quietHours}
       onIntervalChange={onIntervalChange}
+      onQuietHoursChange={onQuietHoursChange}
     >
       {children}
     </NotificationProvider>

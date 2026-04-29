@@ -15,12 +15,19 @@
     },
     "ios": {
       "supportsTablet": false,
+      "bundleIdentifier": "com.learn5.app",
       "infoPlist": {
         "UIBackgroundModes": ["fetch", "remote-notification"]
       }
     },
     "android": {
-      "permissions": ["SCHEDULE_EXACT_ALARM", "POST_NOTIFICATIONS"]
+      "package": "com.learn5.app",
+      "permissions": [
+        "SCHEDULE_EXACT_ALARM",
+        "POST_NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK"
+      ]
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -40,7 +47,9 @@
           "color": "#6366f1",
           "defaultChannel": "learn5-reminders"
         }
-      ]
+      ],
+      "expo-background-fetch",
+      "expo-task-manager"
     ],
     "experiments": {
       "typedRoutes": true,
