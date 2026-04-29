@@ -54,7 +54,8 @@
         }
       ],
       "expo-background-fetch",
-      "expo-task-manager"
+      "expo-task-manager",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
