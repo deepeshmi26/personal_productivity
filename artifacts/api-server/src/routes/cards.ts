@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, responsesTable, cardReviewsTable } from "@workspace/db";
-import { eq, desc, sql, and, gte, isNull } from "drizzle-orm";
+import { eq, desc, gte, and } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -8,46 +8,51 @@ router.get("/cards/session", async (_req, res) => {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const rows = await db.execute(sql`
-    WITH recent AS (
-      SELECT r.id, r.text, r.skipped, r.created_at
-      FROM responses r
-      WHERE r.skipped = false
-        AND r.created_at >= ${thirtyDaysAgo.toISOString()}
-    ),
-    last_review AS (
-      SELECT DISTINCT ON (cr.response_id)
-        cr.response_id,
-        cr.result,
-        cr.reviewed_at
-      FROM card_reviews cr
-      ORDER BY cr.response_id, cr.reviewed_at DESC
-    )
-    SELECT
-      recent.id,
-      recent.text,
-      recent.skipped,
-      recent.created_at AS "createdAt",
-      CASE
-        WHEN lr.result = 'forgot' THEN 0
-        WHEN lr.result IS NULL     THEN 1
-        ELSE                            2
-      END AS priority,
-      lr.reviewed_at
-    FROM recent
-    LEFT JOIN last_review lr ON lr.response_id = recent.id
-    ORDER BY priority ASC, RANDOM()
-    LIMIT 10
-  `);
+  const [responses, allReviews] = await Promise.all([
+    db
+      .select()
+      .from(responsesTable)
+      .where(
+        and(
+          eq(responsesTable.skipped, false),
+          gte(responsesTable.createdAt, thirtyDaysAgo),
+        ),
+      )
+      .orderBy(desc(responsesTable.createdAt)),
+    db
+      .select({
+        responseId: cardReviewsTable.responseId,
+        result: cardReviewsTable.result,
+        reviewedAt: cardReviewsTable.reviewedAt,
+      })
+      .from(cardReviewsTable)
+      .orderBy(desc(cardReviewsTable.reviewedAt)),
+  ]);
 
-  type Row = { id: number; text: string; skipped: boolean; createdAt: Date };
-  const rowArr = (rows as unknown as { rows: Row[] }).rows ?? (rows as unknown as Row[]);
+  const lastResult = new Map<number, string>();
+  for (const r of allReviews) {
+    if (!lastResult.has(r.responseId)) {
+      lastResult.set(r.responseId, r.result);
+    }
+  }
+
+  const priority = (id: number): number => {
+    const r = lastResult.get(id);
+    if (r === "forgot") return 0;
+    if (r === undefined) return 1;
+    return 2;
+  };
+
+  const shuffled = [...responses].sort(() => Math.random() - 0.5);
+  shuffled.sort((a, b) => priority(a.id) - priority(b.id));
+  const session = shuffled.slice(0, 10);
+
   res.json(
-    rowArr.map((r) => ({
+    session.map((r) => ({
       id: r.id,
       text: r.text,
       skipped: r.skipped,
-      createdAt: new Date(r.createdAt).toISOString(),
+      createdAt: r.createdAt.toISOString(),
     })),
   );
 });

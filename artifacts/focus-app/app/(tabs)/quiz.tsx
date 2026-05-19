@@ -1,15 +1,23 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
-  Animated,
+  ActivityIndicator,
   Dimensions,
-  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
-  ActivityIndicator,
 } from "react-native";
+import Animated, {
+  Extrapolation,
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
@@ -22,7 +30,6 @@ import { useColors } from "@/hooks/useColors";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.28;
-const SWIPE_OUT_DURATION = 260;
 
 type CardData = {
   id: number;
@@ -48,179 +55,150 @@ function FlipCard({
   onSwipeRight: () => void;
 }) {
   const colors = useColors();
-  const swipeX = useRef(new Animated.Value(0)).current;
-  const swipeY = useRef(new Animated.Value(0)).current;
-  const flipAnim = useRef(new Animated.Value(0)).current;
-  const [isFlipped, setIsFlipped] = useState(false);
 
-  const frontRotate = flipAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "180deg"],
-  });
-  const backRotate = flipAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["180deg", "360deg"],
-  });
-  const frontOpacity = flipAnim.interpolate({
-    inputRange: [0, 0.5, 0.5, 1],
-    outputRange: [1, 1, 0, 0],
-  });
-  const backOpacity = flipAnim.interpolate({
-    inputRange: [0, 0.5, 0.5, 1],
-    outputRange: [0, 0, 1, 1],
-  });
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const flipProgress = useSharedValue(0);
 
-  const cardRotation = swipeX.interpolate({
-    inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
-    outputRange: ["-8deg", "0deg", "8deg"],
-    extrapolate: "clamp",
-  });
-
-  const greenOverlay = swipeX.interpolate({
-    inputRange: [0, SWIPE_THRESHOLD],
-    outputRange: [0, 0.5],
-    extrapolate: "clamp",
-  });
-  const redOverlay = swipeX.interpolate({
-    inputRange: [-SWIPE_THRESHOLD, 0],
-    outputRange: [0.5, 0],
-    extrapolate: "clamp",
-  });
-  const rememberLabelOpacity = swipeX.interpolate({
-    inputRange: [SWIPE_THRESHOLD * 0.4, SWIPE_THRESHOLD],
-    outputRange: [0, 1],
-    extrapolate: "clamp",
-  });
-  const forgotLabelOpacity = swipeX.interpolate({
-    inputRange: [-SWIPE_THRESHOLD, -SWIPE_THRESHOLD * 0.4],
-    outputRange: [1, 0],
-    extrapolate: "clamp",
-  });
-
-  const forceSwipe = useCallback(
-    (direction: "left" | "right") => {
-      const x = direction === "right" ? SCREEN_WIDTH * 1.5 : -SCREEN_WIDTH * 1.5;
-      Animated.timing(swipeX, {
-        toValue: x,
-        duration: SWIPE_OUT_DURATION,
-        useNativeDriver: true,
-      }).start(() => {
-        if (direction === "right") onSwipeRight();
-        else onSwipeLeft();
-      });
-    },
-    [swipeX, onSwipeLeft, onSwipeRight],
-  );
-
-  const resetPosition = useCallback(() => {
-    Animated.spring(swipeX, {
-      toValue: 0,
-      useNativeDriver: true,
-      friction: 5,
-    }).start();
-    Animated.spring(swipeY, {
-      toValue: 0,
-      useNativeDriver: true,
-      friction: 5,
-    }).start();
-  }, [swipeX, swipeY]);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) =>
-        Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
-      onPanResponderMove: (_, g) => {
-        swipeX.setValue(g.dx);
-        swipeY.setValue(g.dy * 0.15);
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      {
+        rotate: `${interpolate(
+          translateX.value,
+          [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
+          [-8, 0, 8],
+          Extrapolation.CLAMP,
+        )}deg`,
       },
-      onPanResponderRelease: (_, g) => {
-        if (g.dx > SWIPE_THRESHOLD) {
-          forceSwipe("right");
-        } else if (g.dx < -SWIPE_THRESHOLD) {
-          forceSwipe("left");
-        } else {
-          resetPosition();
-        }
-      },
-    }),
-  ).current;
+    ],
+  }));
 
-  const handleFlip = useCallback(() => {
-    const toValue = isFlipped ? 0 : 1;
-    Animated.spring(flipAnim, {
-      toValue,
-      friction: 8,
-      tension: 10,
-      useNativeDriver: true,
-    }).start();
-    setIsFlipped(!isFlipped);
-  }, [isFlipped, flipAnim]);
+  const frontStyle = useAnimatedStyle(() => ({
+    opacity: flipProgress.value < 0.5 ? 1 : 0,
+    transform: [
+      { perspective: 1200 },
+      {
+        rotateY: `${interpolate(flipProgress.value, [0, 1], [0, 180])}deg`,
+      },
+    ],
+  }));
+
+  const backStyle = useAnimatedStyle(() => ({
+    opacity: flipProgress.value >= 0.5 ? 1 : 0,
+    transform: [
+      { perspective: 1200 },
+      {
+        rotateY: `${interpolate(flipProgress.value, [0, 1], [180, 360])}deg`,
+      },
+    ],
+  }));
+
+  const greenOverlayStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      translateX.value,
+      [0, SWIPE_THRESHOLD],
+      [0, 0.5],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  const redOverlayStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      translateX.value,
+      [-SWIPE_THRESHOLD, 0],
+      [0.5, 0],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  const rememberLabelStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      translateX.value,
+      [SWIPE_THRESHOLD * 0.4, SWIPE_THRESHOLD],
+      [0, 1],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  const forgotLabelStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      translateX.value,
+      [-SWIPE_THRESHOLD, -SWIPE_THRESHOLD * 0.4],
+      [1, 0],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  const pan = Gesture.Pan()
+    .activeOffsetX([-8, 8])
+    .onUpdate((e) => {
+      translateX.value = e.translationX;
+      translateY.value = e.translationY * 0.15;
+    })
+    .onEnd((e) => {
+      if (e.translationX > SWIPE_THRESHOLD) {
+        translateX.value = withTiming(
+          SCREEN_WIDTH * 1.5,
+          { duration: 260 },
+          (finished) => {
+            if (finished) runOnJS(onSwipeRight)();
+          },
+        );
+      } else if (e.translationX < -SWIPE_THRESHOLD) {
+        translateX.value = withTiming(
+          -SCREEN_WIDTH * 1.5,
+          { duration: 260 },
+          (finished) => {
+            if (finished) runOnJS(onSwipeLeft)();
+          },
+        );
+      } else {
+        translateX.value = withSpring(0, { damping: 15 });
+        translateY.value = withSpring(0, { damping: 15 });
+      }
+    });
+
+  const tap = Gesture.Tap().onEnd(() => {
+    const toValue = flipProgress.value < 0.5 ? 1 : 0;
+    flipProgress.value = withSpring(toValue, { damping: 10, stiffness: 100 });
+  });
+
+  const composed = Gesture.Race(pan, tap);
 
   return (
-    <Animated.View
-      style={[
-        styles.cardContainer,
-        {
-          transform: [
-            { translateX: swipeX },
-            { translateY: swipeY },
-            { rotate: cardRotation },
-          ],
-        },
-      ]}
-      {...panResponder.panHandlers}
-    >
-      {/* Remember label */}
-      <Animated.View
-        style={[
-          styles.swipeLabel,
-          styles.swipeLabelRight,
-          { opacity: rememberLabelOpacity },
-        ]}
-        pointerEvents="none"
-      >
-        <Text style={styles.swipeLabelText}>✓ Got it</Text>
-      </Animated.View>
+    <GestureDetector gesture={composed}>
+      <Animated.View style={[styles.cardContainer, cardStyle]}>
+        {/* Swipe labels */}
+        <Animated.View
+          style={[styles.swipeLabel, styles.swipeLabelRight, rememberLabelStyle]}
+          pointerEvents="none"
+        >
+          <Text style={styles.swipeLabelTextGreen}>✓ Got it</Text>
+        </Animated.View>
+        <Animated.View
+          style={[styles.swipeLabel, styles.swipeLabelLeft, forgotLabelStyle]}
+          pointerEvents="none"
+        >
+          <Text style={styles.swipeLabelTextRed}>✗ Forgot</Text>
+        </Animated.View>
 
-      {/* Forgot label */}
-      <Animated.View
-        style={[
-          styles.swipeLabel,
-          styles.swipeLabelLeft,
-          { opacity: forgotLabelOpacity },
-        ]}
-        pointerEvents="none"
-      >
-        <Text style={styles.swipeLabelText}>✗ Forgot</Text>
-      </Animated.View>
-
-      <Pressable onPress={handleFlip} style={{ flex: 1 }}>
         {/* Front face */}
         <Animated.View
           style={[
             styles.card,
-            {
-              backgroundColor: colors.card,
-              borderColor: colors.border,
-              opacity: frontOpacity,
-              transform: [{ perspective: 1200 }, { rotateY: frontRotate }],
-            },
+            { backgroundColor: colors.card, borderColor: colors.border },
+            frontStyle,
           ]}
         >
           <Animated.View
-            style={[
-              StyleSheet.absoluteFill,
-              styles.colorOverlay,
-              { backgroundColor: "#22c55e", opacity: greenOverlay },
-            ]}
+            style={[StyleSheet.absoluteFill, styles.colorOverlay, { backgroundColor: "#22c55e" }, greenOverlayStyle]}
+            pointerEvents="none"
           />
           <Animated.View
-            style={[
-              StyleSheet.absoluteFill,
-              styles.colorOverlay,
-              { backgroundColor: "#ef4444", opacity: redOverlay },
-            ]}
+            style={[StyleSheet.absoluteFill, styles.colorOverlay, { backgroundColor: "#ef4444" }, redOverlayStyle]}
+            pointerEvents="none"
           />
           <View style={styles.cardBadge}>
             <Text style={[styles.cardBadgeText, { color: colors.mutedForeground }]}>
@@ -245,27 +223,17 @@ function FlipCard({
           style={[
             styles.card,
             styles.cardBack,
-            {
-              backgroundColor: colors.card,
-              borderColor: colors.primary,
-              opacity: backOpacity,
-              transform: [{ perspective: 1200 }, { rotateY: backRotate }],
-            },
+            { backgroundColor: colors.card, borderColor: colors.primary },
+            backStyle,
           ]}
         >
           <Animated.View
-            style={[
-              StyleSheet.absoluteFill,
-              styles.colorOverlay,
-              { backgroundColor: "#22c55e", opacity: greenOverlay },
-            ]}
+            style={[StyleSheet.absoluteFill, styles.colorOverlay, { backgroundColor: "#22c55e" }, greenOverlayStyle]}
+            pointerEvents="none"
           />
           <Animated.View
-            style={[
-              StyleSheet.absoluteFill,
-              styles.colorOverlay,
-              { backgroundColor: "#ef4444", opacity: redOverlay },
-            ]}
+            style={[StyleSheet.absoluteFill, styles.colorOverlay, { backgroundColor: "#ef4444" }, redOverlayStyle]}
+            pointerEvents="none"
           />
           <View style={styles.cardBadge}>
             <Text style={[styles.cardBadgeText, { color: colors.primary }]}>
@@ -289,8 +257,8 @@ function FlipCard({
             <Feather name="arrow-right" size={13} color={colors.mutedForeground} />
           </View>
         </Animated.View>
-      </Pressable>
-    </Animated.View>
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
@@ -316,8 +284,7 @@ function CompletionScreen({
       <Text style={[styles.completionSub, { color: colors.mutedForeground }]}>
         {total} card{total !== 1 ? "s" : ""} reviewed
       </Text>
-
-      <View style={[styles.statsRow]}>
+      <View style={styles.statsRow}>
         <View style={[styles.statPill, { backgroundColor: "#dcfce7" }]}>
           <Feather name="check" size={15} color="#16a34a" />
           <Text style={[styles.statPillText, { color: "#16a34a" }]}>
@@ -331,13 +298,11 @@ function CompletionScreen({
           </Text>
         </View>
       </View>
-
       {forgot > 0 && (
         <Text style={[styles.revisitNote, { color: colors.mutedForeground }]}>
           Forgotten cards will appear first next session.
         </Text>
       )}
-
       <Pressable
         onPress={onGoAgain}
         style={({ pressed }) => [
@@ -345,7 +310,9 @@ function CompletionScreen({
           { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
         ]}
       >
-        <Text style={[styles.goAgainText, { color: "#fff" }]}>Start new session</Text>
+        <Text style={[styles.goAgainText, { color: "#fff" }]}>
+          Start new session
+        </Text>
       </Pressable>
     </View>
   );
@@ -383,7 +350,9 @@ export default function QuizScreen() {
     setCurrentIndex(0);
     setRemembered(0);
     setForgot(0);
-    await queryClient.invalidateQueries({ queryKey: getGetCardSessionQueryKey() });
+    await queryClient.invalidateQueries({
+      queryKey: getGetCardSessionQueryKey(),
+    });
     refetch();
   }, [queryClient, refetch]);
 
@@ -403,7 +372,9 @@ export default function QuizScreen() {
           Couldn't load cards. Check your connection.
         </Text>
         <Pressable onPress={() => refetch()}>
-          <Text style={[styles.retryText, { color: colors.primary }]}>Retry</Text>
+          <Text style={[styles.retryText, { color: colors.primary }]}>
+            Retry
+          </Text>
         </Pressable>
       </View>
     );
@@ -420,10 +391,16 @@ export default function QuizScreen() {
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: topPad }]}>
-      {/* Header */}
+    <View
+      style={[
+        styles.screen,
+        { backgroundColor: colors.background, paddingTop: topPad },
+      ]}
+    >
       <View style={styles.header}>
-        <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>QUIZ</Text>
+        <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>
+          QUIZ
+        </Text>
         <Text style={[styles.title, { color: colors.foreground }]}>
           Test your{"\n"}memory.
         </Text>
@@ -431,24 +408,36 @@ export default function QuizScreen() {
 
       {isEmpty ? (
         <View style={styles.emptyContainer}>
-          <View style={[styles.emptyIcon, { backgroundColor: colors.accent }]}>
-            <Feather name="layers" size={28} color={colors.accentForeground} />
+          <View
+            style={[styles.emptyIcon, { backgroundColor: colors.accent }]}
+          >
+            <Feather
+              name="layers"
+              size={28}
+              color={colors.accentForeground}
+            />
           </View>
           <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
             No entries to review
           </Text>
-          <Text style={[styles.emptyBody, { color: colors.mutedForeground }]}>
-            Capture a few things you've learned and they'll show up here for review.
+          <Text
+            style={[styles.emptyBody, { color: colors.mutedForeground }]}
+          >
+            Capture a few things you've learned and they'll show up here for
+            review.
           </Text>
         </View>
       ) : (
         <>
-          {/* Progress */}
           <View style={styles.progress}>
-            <Text style={[styles.progressText, { color: colors.mutedForeground }]}>
+            <Text
+              style={[styles.progressText, { color: colors.mutedForeground }]}
+            >
               {currentIndex + 1} / {cards.length}
             </Text>
-            <View style={[styles.progressBar, { backgroundColor: colors.muted }]}>
+            <View
+              style={[styles.progressBar, { backgroundColor: colors.muted }]}
+            >
               <View
                 style={[
                   styles.progressFill,
@@ -461,16 +450,21 @@ export default function QuizScreen() {
             </View>
           </View>
 
-          {/* Stack shadow cards */}
+          {/* Shadow card beneath */}
           {cards[currentIndex + 1] && (
             <View
               style={[
                 styles.cardContainer,
-                styles.shadowCard2,
-                { backgroundColor: colors.card, borderColor: colors.border },
+                styles.shadowCard,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                },
               ]}
             />
           )}
+
+          {/* Active card */}
           {cards[currentIndex] && (
             <FlipCard
               key={cards[currentIndex]!.id}
@@ -491,7 +485,9 @@ export default function QuizScreen() {
               ]}
             >
               <Feather name="x" size={22} color="#ef4444" />
-              <Text style={[styles.actionBtnText, { color: "#ef4444" }]}>Forgot</Text>
+              <Text style={[styles.actionBtnText, { color: "#ef4444" }]}>
+                Forgot
+              </Text>
             </Pressable>
             <Pressable
               onPress={() => handleResult("remembered")}
@@ -502,7 +498,9 @@ export default function QuizScreen() {
               ]}
             >
               <Feather name="check" size={22} color="#16a34a" />
-              <Text style={[styles.actionBtnText, { color: "#16a34a" }]}>Got it</Text>
+              <Text style={[styles.actionBtnText, { color: "#16a34a" }]}>
+                Got it
+              </Text>
             </Pressable>
           </View>
         </>
@@ -510,6 +508,9 @@ export default function QuizScreen() {
     </View>
   );
 }
+
+const CARD_TOP = Platform.OS === "web" ? 200 : 190;
+const CARD_BOTTOM = 140;
 
 const styles = StyleSheet.create({
   screen: {
@@ -563,15 +564,14 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 20,
     right: 20,
-    top: Platform.OS === "web" ? 200 : 190,
-    bottom: 140,
+    top: CARD_TOP,
+    bottom: CARD_BOTTOM,
     borderRadius: 24,
   },
-  shadowCard2: {
+  shadowCard: {
     borderWidth: 1,
-    borderRadius: 24,
-    top: Platform.OS === "web" ? 207 : 197,
-    bottom: 133,
+    top: CARD_TOP + 7,
+    bottom: CARD_BOTTOM - 7,
     transform: [{ scale: 0.96 }],
   },
   card: {
@@ -642,10 +642,15 @@ const styles = StyleSheet.create({
     borderColor: "#dc2626",
     backgroundColor: "#fee2e2",
   },
-  swipeLabelText: {
+  swipeLabelTextGreen: {
     fontFamily: "Inter_700Bold",
     fontSize: 14,
     color: "#15803d",
+  },
+  swipeLabelTextRed: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    color: "#dc2626",
   },
   actions: {
     position: "absolute",
