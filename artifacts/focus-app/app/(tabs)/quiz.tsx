@@ -169,7 +169,7 @@ function FlipCard({
 
   return (
     <GestureDetector gesture={composed}>
-      <Animated.View style={[styles.cardContainer, cardStyle]}>
+      <Animated.View style={[StyleSheet.absoluteFill, styles.cardContainer, cardStyle]}>
         {/* Swipe labels */}
         <Animated.View
           style={[styles.swipeLabel, styles.swipeLabelRight, rememberLabelStyle]}
@@ -394,7 +394,11 @@ export default function QuizScreen() {
     <View
       style={[
         styles.screen,
-        { backgroundColor: colors.background, paddingTop: topPad },
+        {
+          backgroundColor: colors.background,
+          paddingTop: topPad,
+          paddingBottom: Platform.OS === "web" ? 84 + 16 : Math.max(insets.bottom, 16),
+        },
       ]}
     >
       <View style={styles.header}>
@@ -450,29 +454,29 @@ export default function QuizScreen() {
             </View>
           </View>
 
-          {/* Shadow card beneath */}
-          {cards[currentIndex + 1] && (
-            <View
-              style={[
-                styles.cardContainer,
-                styles.shadowCard,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                },
-              ]}
-            />
-          )}
-
-          {/* Active card */}
-          {cards[currentIndex] && (
-            <FlipCard
-              key={cards[currentIndex]!.id}
-              card={cards[currentIndex]!}
-              onSwipeLeft={() => handleResult("forgot")}
-              onSwipeRight={() => handleResult("remembered")}
-            />
-          )}
+          {/* Card area — fills remaining space */}
+          <View style={styles.cardArea}>
+            {cards[currentIndex + 1] && (
+              <View
+                style={[
+                  StyleSheet.absoluteFill,
+                  styles.shadowCard,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                  },
+                ]}
+              />
+            )}
+            {cards[currentIndex] && (
+              <FlipCard
+                key={cards[currentIndex]!.id}
+                card={cards[currentIndex]!}
+                onSwipeLeft={() => handleResult("forgot")}
+                onSwipeRight={() => handleResult("remembered")}
+              />
+            )}
+          </View>
 
           {/* Action buttons */}
           <View style={styles.actions}>
@@ -509,13 +513,11 @@ export default function QuizScreen() {
   );
 }
 
-const CARD_TOP = Platform.OS === "web" ? 200 : 190;
-const CARD_BOTTOM = 140;
-
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
     paddingHorizontal: 20,
+    paddingBottom: 16,
   },
   center: {
     flex: 1,
@@ -560,18 +562,17 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 2,
   },
+  cardArea: {
+    flex: 1,
+    marginBottom: 12,
+  },
   cardContainer: {
-    position: "absolute",
-    left: 20,
-    right: 20,
-    top: CARD_TOP,
-    bottom: CARD_BOTTOM,
     borderRadius: 24,
   },
   shadowCard: {
     borderWidth: 1,
-    top: CARD_TOP + 7,
-    bottom: CARD_BOTTOM - 7,
+    borderRadius: 24,
+    top: 7,
     transform: [{ scale: 0.96 }],
   },
   card: {
@@ -653,10 +654,6 @@ const styles = StyleSheet.create({
     color: "#dc2626",
   },
   actions: {
-    position: "absolute",
-    bottom: 32,
-    left: 20,
-    right: 20,
     flexDirection: "row",
     gap: 12,
   },
