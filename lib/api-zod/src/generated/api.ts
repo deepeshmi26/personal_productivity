@@ -134,3 +134,28 @@ export const UpdateSettingsResponse = zod.object({
     .regex(updateSettingsResponseQuietHoursEndRegExp)
     .describe("End of quiet window in HH:mm (24h)"),
 });
+
+/**
+ * Returns up to 10 non-skipped responses from the last 30 days, ordered forgot-first then never-reviewed then random
+ * @summary Get cards for a quiz session
+ */
+export const GetCardSessionResponseItem = zod.object({
+  id: zod.number(),
+  text: zod
+    .string()
+    .describe("The user's response text, or empty string if \"I don't know\""),
+  skipped: zod.boolean().describe('True if the user tapped \"I don\'t know\"'),
+  createdAt: zod.coerce.date(),
+});
+export const GetCardSessionResponse = zod.array(GetCardSessionResponseItem);
+
+/**
+ * @summary Record a card review result
+ */
+export const ReviewCardParams = zod.object({
+  responseId: zod.coerce.number(),
+});
+
+export const ReviewCardBody = zod.object({
+  result: zod.enum(["remembered", "forgot"]),
+});

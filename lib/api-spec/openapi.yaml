@@ -14,6 +14,8 @@ tags:
     description: Learning responses
   - name: settings
     description: User settings
+  - name: cards
+    description: Memory quiz cards
 paths:
   /healthz:
     get:
@@ -102,6 +104,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Settings"
+  /cards/session:
+    get:
+      operationId: getCardSession
+      tags: [cards]
+      summary: Get cards for a quiz session
+      description: Returns up to 10 non-skipped responses from the last 30 days, ordered forgot-first then never-reviewed then random
+      responses:
+        "200":
+          description: Session cards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LearningResponse"
+  /cards/{responseId}/review:
+    post:
+      operationId: reviewCard
+      tags: [cards]
+      summary: Record a card review result
+      parameters:
+        - name: responseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CardReviewRequest"
+      responses:
+        "204":
+          description: Review recorded
+        "404":
+          description: Response not found
 components:
   schemas:
     HealthStatus:
@@ -189,6 +228,14 @@ components:
         - quietHoursEnabled
         - quietHoursStart
         - quietHoursEnd
+    CardReviewRequest:
+      type: object
+      properties:
+        result:
+          type: string
+          enum: [remembered, forgot]
+      required:
+        - result
     UpdateSettingsRequest:
       type: object
       properties:

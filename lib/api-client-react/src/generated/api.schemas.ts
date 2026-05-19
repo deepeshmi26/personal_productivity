@@ -55,6 +55,18 @@ export interface Settings {
   quietHoursEnd: string;
 }
 
+export type CardReviewRequestResult =
+  (typeof CardReviewRequestResult)[keyof typeof CardReviewRequestResult];
+
+export const CardReviewRequestResult = {
+  remembered: "remembered",
+  forgot: "forgot",
+} as const;
+
+export interface CardReviewRequest {
+  result: CardReviewRequestResult;
+}
+
 export interface UpdateSettingsRequest {
   /**
    * @minimum 1

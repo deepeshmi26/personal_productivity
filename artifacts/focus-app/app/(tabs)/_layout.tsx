@@ -20,6 +20,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "book", selected: "book.fill" }} />
         <Label>Journal</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="quiz">
+        <Icon sf={{ default: "brain.head.profile", selected: "brain.head.profile" }} />
+        <Label>Quiz</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">
         <Icon sf={{ default: "gearshape", selected: "gearshape.fill" }} />
         <Label>Settings</Label>
@@ -91,6 +95,18 @@ function ClassicTabLayout() {
               <SymbolView name="book" tintColor={color} size={24} />
             ) : (
               <Feather name="book-open" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="quiz"
+        options={{
+          title: "Quiz",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="brain.head.profile" tintColor={color} size={24} />
+            ) : (
+              <Feather name="layers" size={22} color={color} />
             ),
         }}
       />

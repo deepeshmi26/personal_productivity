@@ -17,6 +17,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  CardReviewRequest,
   CreateResponseRequest,
   HealthStatus,
   LearningResponse,
@@ -505,4 +506,167 @@ export const useUpdateSettings = <
   TContext
 > => {
   return useMutation(getUpdateSettingsMutationOptions(options));
+};
+
+/**
+ * Returns up to 10 non-skipped responses from the last 30 days, ordered forgot-first then never-reviewed then random
+ * @summary Get cards for a quiz session
+ */
+export const getGetCardSessionUrl = () => {
+  return `/api/cards/session`;
+};
+
+export const getCardSession = async (
+  options?: RequestInit,
+): Promise<LearningResponse[]> => {
+  return customFetch<LearningResponse[]>(getGetCardSessionUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCardSessionQueryKey = () => {
+  return [`/api/cards/session`] as const;
+};
+
+export const getGetCardSessionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCardSession>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCardSession>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetCardSessionQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCardSession>>> = ({
+    signal,
+  }) => getCardSession({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCardSession>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCardSessionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCardSession>>
+>;
+export type GetCardSessionQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get cards for a quiz session
+ */
+
+export function useGetCardSession<
+  TData = Awaited<ReturnType<typeof getCardSession>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCardSession>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCardSessionQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Record a card review result
+ */
+export const getReviewCardUrl = (responseId: number) => {
+  return `/api/cards/${responseId}/review`;
+};
+
+export const reviewCard = async (
+  responseId: number,
+  cardReviewRequest: CardReviewRequest,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getReviewCardUrl(responseId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(cardReviewRequest),
+  });
+};
+
+export const getReviewCardMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reviewCard>>,
+    TError,
+    { responseId: number; data: BodyType<CardReviewRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reviewCard>>,
+  TError,
+  { responseId: number; data: BodyType<CardReviewRequest> },
+  TContext
+> => {
+  const mutationKey = ["reviewCard"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reviewCard>>,
+    { responseId: number; data: BodyType<CardReviewRequest> }
+  > = (props) => {
+    const { responseId, data } = props ?? {};
+
+    return reviewCard(responseId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReviewCardMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reviewCard>>
+>;
+export type ReviewCardMutationBody = BodyType<CardReviewRequest>;
+export type ReviewCardMutationError = ErrorType<void>;
+
+/**
+ * @summary Record a card review result
+ */
+export const useReviewCard = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reviewCard>>,
+    TError,
+    { responseId: number; data: BodyType<CardReviewRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reviewCard>>,
+  TError,
+  { responseId: number; data: BodyType<CardReviewRequest> },
+  TContext
+> => {
+  return useMutation(getReviewCardMutationOptions(options));
 };

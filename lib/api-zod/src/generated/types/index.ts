@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./cardReviewRequest";
+export * from "./cardReviewRequestResult";
 export * from "./createResponseRequest";
 export * from "./healthStatus";
 export * from "./learningResponse";
