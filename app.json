@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "24156319-136b-401f-86b8-d9e3e57cb244"
+      }
+    },
+    "android": {
+      "package": "com.deepes.mi26.workspace"
+    }
+  }
+}
