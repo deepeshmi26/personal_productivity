@@ -1,16 +1,48 @@
 import { Router, type IRouter } from "express";
-import { db, responsesTable, cardReviewsTable, cardQuestionsTable } from "@workspace/db";
-import { eq, desc, gte, and, inArray } from "drizzle-orm";
+import {
+  db,
+  responsesTable,
+  cardReviewsTable,
+  cardQuestionsTable,
+  cardSchedulesTable,
+} from "@workspace/db";
+import { eq, lte, gt, gte, and, inArray, isNull, sql } from "drizzle-orm";
 import { batchProcess } from "@workspace/integrations-openai-ai-server/batch";
 import { logger } from "../lib/logger";
 import type { openai as OpenAIInstance } from "@workspace/integrations-openai-ai-server";
 
 const router: IRouter = Router();
 
+// New cards introduced per session. Wrong-answer and due-correct cards are
+// unlimited — they grow/shrink based on what's actually due that day.
+const NEW_CARDS_PER_SESSION = 20;
+
+// ─── Spaced-repetition schedule ───────────────────────────────────────────────
+// After a correct answer the card advances to the next interval.
+// After a wrong answer it resets to 0 (due every day until correct again).
+const SRS_INTERVALS = [1, 2, 3, 7, 14, 30]; // days
+
+function nextIntervalDays(current: number): number {
+  for (const i of SRS_INTERVALS) {
+    if (current < i) return i;
+  }
+  return 30; // already at max
+}
+
+function todayStr(): string {
+  return new Date().toISOString().split("T")[0]!; // YYYY-MM-DD
+}
+
+function dueDateStr(addDays: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + addDays);
+  return d.toISOString().split("T")[0]!;
+}
+
+// ─── AI question generation ───────────────────────────────────────────────────
 const QUESTION_TIMEOUT_MS = 8000;
 
 type OpenAIClient = typeof OpenAIInstance;
-
 let _clientPromise: Promise<OpenAIClient | null> | null = null;
 
 function getOpenAIClientPromise(): Promise<OpenAIClient | null> {
@@ -44,10 +76,7 @@ async function generateQuestion(text: string): Promise<string> {
         content:
           "You are a spaced-repetition quiz assistant. Given a learning note, write a single, concise quiz question (max 15 words) that tests whether the learner can recall the key insight. Return only the question, no explanation.",
       },
-      {
-        role: "user",
-        content: text,
-      },
+      { role: "user", content: text },
     ],
   });
 
@@ -60,48 +89,75 @@ async function generateQuestion(text: string): Promise<string> {
   return choice?.message?.content?.trim() ?? "";
 }
 
-router.get("/cards/session", async (req, res) => {
+// ─── Routes ───────────────────────────────────────────────────────────────────
+
+router.get("/cards/session", async (_req, res) => {
+  const today = todayStr();
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const [responses, allReviews] = await Promise.all([
-    db
-      .select()
-      .from(responsesTable)
-      .where(
-        and(
-          eq(responsesTable.skipped, false),
-          gte(responsesTable.createdAt, thirtyDaysAgo),
-        ),
-      )
-      .orderBy(desc(responsesTable.createdAt)),
-    db
-      .select({
-        responseId: cardReviewsTable.responseId,
-        result: cardReviewsTable.result,
-        reviewedAt: cardReviewsTable.reviewedAt,
-      })
-      .from(cardReviewsTable)
-      .orderBy(desc(cardReviewsTable.reviewedAt)),
-  ]);
+  const shuffle = <T>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5);
 
-  const lastResult = new Map<number, string>();
-  for (const r of allReviews) {
-    if (!lastResult.has(r.responseId)) {
-      lastResult.set(r.responseId, r.result);
-    }
-  }
+  // Bucket 1: wrong-answer cards (interval = 0, due today or overdue)
+  const wrongCards = await db
+    .select({
+      id: responsesTable.id,
+      text: responsesTable.text,
+      skipped: responsesTable.skipped,
+      createdAt: responsesTable.createdAt,
+    })
+    .from(cardSchedulesTable)
+    .innerJoin(responsesTable, eq(cardSchedulesTable.responseId, responsesTable.id))
+    .where(
+      and(
+        eq(responsesTable.skipped, false),
+        eq(cardSchedulesTable.intervalDays, 0),
+        lte(cardSchedulesTable.dueDate, today),
+      ),
+    );
 
-  const priority = (id: number): number => {
-    const r = lastResult.get(id);
-    if (r === "forgot") return 0;
-    if (r === undefined) return 1;
-    return 2;
-  };
+  // Bucket 2: new cards — no schedule yet, last 30 days, not skipped
+  const newCards = await db
+    .select({
+      id: responsesTable.id,
+      text: responsesTable.text,
+      skipped: responsesTable.skipped,
+      createdAt: responsesTable.createdAt,
+    })
+    .from(responsesTable)
+    .leftJoin(cardSchedulesTable, eq(responsesTable.id, cardSchedulesTable.responseId))
+    .where(
+      and(
+        eq(responsesTable.skipped, false),
+        gte(responsesTable.createdAt, thirtyDaysAgo),
+        isNull(cardSchedulesTable.id),
+      ),
+    );
 
-  const shuffled = [...responses].sort(() => Math.random() - 0.5);
-  shuffled.sort((a, b) => priority(a.id) - priority(b.id));
-  const session = shuffled.slice(0, 10);
+  // Bucket 3: correct-answer cards due today (interval > 0, due today or overdue)
+  const dueCorrectCards = await db
+    .select({
+      id: responsesTable.id,
+      text: responsesTable.text,
+      skipped: responsesTable.skipped,
+      createdAt: responsesTable.createdAt,
+    })
+    .from(cardSchedulesTable)
+    .innerJoin(responsesTable, eq(cardSchedulesTable.responseId, responsesTable.id))
+    .where(
+      and(
+        eq(responsesTable.skipped, false),
+        gt(cardSchedulesTable.intervalDays, 0),
+        lte(cardSchedulesTable.dueDate, today),
+      ),
+    );
+
+  // Ordered: wrong → new (capped) → due correct (shuffled within each bucket)
+  const session = [
+    ...shuffle(wrongCards),
+    ...shuffle(newCards).slice(0, NEW_CARDS_PER_SESSION),
+    ...shuffle(dueCorrectCards),
+  ];
 
   if (session.length === 0) {
     res.json([]);
@@ -110,6 +166,7 @@ router.get("/cards/session", async (req, res) => {
 
   const sessionIds = session.map((r) => r.id);
 
+  // Attach only already-cached AI questions — respond immediately, don't block on AI
   const cachedQuestions = await db
     .select()
     .from(cardQuestionsTable)
@@ -119,40 +176,37 @@ router.get("/cards/session", async (req, res) => {
     cachedQuestions.map((q) => [q.responseId, q.question]),
   );
 
+  // Fire-and-forget: generate questions for uncached cards in the background.
+  // On the next session load they'll already be cached.
   const uncached = session.filter((r) => !questionMap.has(r.id));
-
   if (uncached.length > 0) {
-    const results = await batchProcess(
-      uncached,
-      async (card) => {
-        try {
-          const question = await generateQuestion(card.text);
-          if (!question) {
-            logger.warn({ responseId: card.id }, "AI returned empty question");
-          }
-          return question ? { responseId: card.id, question } : null;
-        } catch (err) {
-          logger.error({ responseId: card.id, err }, "Failed to generate question");
-          return null;
+    void (async () => {
+      try {
+        const results = await batchProcess(
+          uncached,
+          async (card: { id: number; text: string; skipped: boolean; createdAt: Date }) => {
+            try {
+              const question = await generateQuestion(card.text);
+              if (!question) logger.warn({ responseId: card.id }, "AI returned empty question");
+              return question ? { responseId: card.id, question } : null;
+            } catch (err) {
+              logger.error({ responseId: card.id, err }, "Failed to generate question");
+              return null;
+            }
+          },
+          { concurrency: 2, retries: 3 },
+        );
+        const toInsert = results.filter(
+          (r): r is { responseId: number; question: string } => r !== null && !!r.question,
+        );
+        if (toInsert.length > 0) {
+          await db.insert(cardQuestionsTable).values(toInsert).onConflictDoNothing();
+          logger.info({ count: toInsert.length }, "Background: cached new AI questions");
         }
-      },
-      { concurrency: 2, retries: 3 },
-    );
-
-    const toInsert: { responseId: number; question: string }[] = [];
-    for (const result of results) {
-      if (result && result.question) {
-        questionMap.set(result.responseId, result.question);
-        toInsert.push(result);
+      } catch (err) {
+        logger.error({ err }, "Background question generation failed");
       }
-    }
-
-    if (toInsert.length > 0) {
-      await db
-        .insert(cardQuestionsTable)
-        .values(toInsert)
-        .onConflictDoNothing();
-    }
+    })();
   }
 
   res.json(
@@ -190,7 +244,39 @@ router.post("/cards/:responseId/review", async (req, res) => {
     return;
   }
 
+  // Record raw review history
   await db.insert(cardReviewsTable).values({ responseId, result });
+
+  // Update SRS schedule
+  const [current] = await db
+    .select({ intervalDays: cardSchedulesTable.intervalDays })
+    .from(cardSchedulesTable)
+    .where(eq(cardSchedulesTable.responseId, responseId))
+    .limit(1);
+
+  let newIntervalDays: number;
+  let newDueDate: string;
+
+  if (result === "forgot") {
+    newIntervalDays = 0;
+    newDueDate = todayStr(); // overdue immediately → appears every day
+  } else {
+    newIntervalDays = nextIntervalDays(current?.intervalDays ?? 0);
+    newDueDate = dueDateStr(newIntervalDays);
+  }
+
+  await db
+    .insert(cardSchedulesTable)
+    .values({ responseId, intervalDays: newIntervalDays, dueDate: newDueDate })
+    .onConflictDoUpdate({
+      target: cardSchedulesTable.responseId,
+      set: {
+        intervalDays: newIntervalDays,
+        dueDate: newDueDate,
+        updatedAt: sql`NOW()`,
+      },
+    });
+
   res.status(204).send();
 });
 
