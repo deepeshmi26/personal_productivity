@@ -1,10 +1,66 @@
 import { Router, type IRouter } from "express";
-import { db, responsesTable, cardReviewsTable } from "@workspace/db";
-import { eq, desc, gte, and } from "drizzle-orm";
+import { db, responsesTable, cardReviewsTable, cardQuestionsTable } from "@workspace/db";
+import { eq, desc, gte, and, inArray } from "drizzle-orm";
+import { batchProcess } from "@workspace/integrations-openai-ai-server/batch";
+import { logger } from "../lib/logger";
+import type { openai as OpenAIInstance } from "@workspace/integrations-openai-ai-server";
 
 const router: IRouter = Router();
 
-router.get("/cards/session", async (_req, res) => {
+const QUESTION_TIMEOUT_MS = 8000;
+
+type OpenAIClient = typeof OpenAIInstance;
+
+let _clientPromise: Promise<OpenAIClient | null> | null = null;
+
+function getOpenAIClientPromise(): Promise<OpenAIClient | null> {
+  if (!_clientPromise) {
+    _clientPromise = import("@workspace/integrations-openai-ai-server")
+      .then((m) => m.openai)
+      .catch((err: unknown) => {
+        logger.warn({ err }, "OpenAI client unavailable — AI questions disabled");
+        return null;
+      });
+  }
+  return _clientPromise;
+}
+
+async function generateQuestion(text: string): Promise<string> {
+  const client = await getOpenAIClientPromise();
+  if (!client) return "";
+
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new Error("Question generation timed out")),
+      QUESTION_TIMEOUT_MS,
+    ),
+  );
+
+  const aiCall = client.chat.completions.create({
+    model: "gpt-5-mini",
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a spaced-repetition quiz assistant. Given a learning note, write a single, concise quiz question (max 15 words) that tests whether the learner can recall the key insight. Return only the question, no explanation.",
+      },
+      {
+        role: "user",
+        content: text,
+      },
+    ],
+  });
+
+  const response = await Promise.race([aiCall, timeout]);
+  const choice = response.choices[0];
+  logger.debug(
+    { finishReason: choice?.finish_reason, content: choice?.message?.content },
+    "AI question response",
+  );
+  return choice?.message?.content?.trim() ?? "";
+}
+
+router.get("/cards/session", async (req, res) => {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -47,12 +103,65 @@ router.get("/cards/session", async (_req, res) => {
   shuffled.sort((a, b) => priority(a.id) - priority(b.id));
   const session = shuffled.slice(0, 10);
 
+  if (session.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  const sessionIds = session.map((r) => r.id);
+
+  const cachedQuestions = await db
+    .select()
+    .from(cardQuestionsTable)
+    .where(inArray(cardQuestionsTable.responseId, sessionIds));
+
+  const questionMap = new Map<number, string>(
+    cachedQuestions.map((q) => [q.responseId, q.question]),
+  );
+
+  const uncached = session.filter((r) => !questionMap.has(r.id));
+
+  if (uncached.length > 0) {
+    const results = await batchProcess(
+      uncached,
+      async (card) => {
+        try {
+          const question = await generateQuestion(card.text);
+          if (!question) {
+            logger.warn({ responseId: card.id }, "AI returned empty question");
+          }
+          return question ? { responseId: card.id, question } : null;
+        } catch (err) {
+          logger.error({ responseId: card.id, err }, "Failed to generate question");
+          return null;
+        }
+      },
+      { concurrency: 2, retries: 3 },
+    );
+
+    const toInsert: { responseId: number; question: string }[] = [];
+    for (const result of results) {
+      if (result && result.question) {
+        questionMap.set(result.responseId, result.question);
+        toInsert.push(result);
+      }
+    }
+
+    if (toInsert.length > 0) {
+      await db
+        .insert(cardQuestionsTable)
+        .values(toInsert)
+        .onConflictDoNothing();
+    }
+  }
+
   res.json(
     session.map((r) => ({
       id: r.id,
       text: r.text,
       skipped: r.skipped,
       createdAt: r.createdAt.toISOString(),
+      question: questionMap.get(r.id) ?? "",
     })),
   );
 });

@@ -26,6 +26,12 @@ export const ListResponsesResponseItem = zod.object({
     .describe("The user's response text, or empty string if \"I don't know\""),
   skipped: zod.boolean().describe('True if the user tapped \"I don\'t know\"'),
   createdAt: zod.coerce.date(),
+  question: zod
+    .string()
+    .optional()
+    .describe(
+      "AI-generated quiz question for this entry, or empty string if not yet generated",
+    ),
 });
 export const ListResponsesResponse = zod.array(ListResponsesResponseItem);
 
@@ -146,6 +152,12 @@ export const GetCardSessionResponseItem = zod.object({
     .describe("The user's response text, or empty string if \"I don't know\""),
   skipped: zod.boolean().describe('True if the user tapped \"I don\'t know\"'),
   createdAt: zod.coerce.date(),
+  question: zod
+    .string()
+    .optional()
+    .describe(
+      "AI-generated quiz question for this entry, or empty string if not yet generated",
+    ),
 });
 export const GetCardSessionResponse = zod.array(GetCardSessionResponseItem);
 

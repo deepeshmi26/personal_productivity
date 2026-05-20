@@ -13,4 +13,6 @@ export interface LearningResponse {
   /** True if the user tapped "I don't know" */
   skipped: boolean;
   createdAt: Date;
+  /** AI-generated quiz question for this entry, or empty string if not yet generated */
+  question?: string;
 }

@@ -164,6 +164,9 @@ components:
         createdAt:
           type: string
           format: date-time
+        question:
+          type: string
+          description: AI-generated quiz question for this entry, or empty string if not yet generated
       required:
         - id
         - text

@@ -35,6 +35,7 @@ type CardData = {
   id: number;
   text: string;
   createdAt: string;
+  question?: string;
 };
 
 function formatCardDate(iso: string) {
@@ -207,7 +208,7 @@ function FlipCard({
           </View>
           <View style={styles.cardBody}>
             <Text style={[styles.cardPrompt, { color: colors.mutedForeground }]}>
-              What did you learn here?
+              {card.question || "What did you learn here?"}
             </Text>
           </View>
           <View style={styles.cardHint}>
