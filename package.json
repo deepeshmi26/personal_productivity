@@ -8,7 +8,7 @@
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
     "eas-build-pre-install": "echo '=== EAS pre-install hook ===' && echo \"Node: $(node --version)\" && echo \"Initial pnpm: $(pnpm --version 2>/dev/null || echo none)\" && npm install -g pnpm@10.26.1 --force && echo \"Final pnpm: $(pnpm --version)\" && echo \"pnpm path: $(which pnpm)\"",
-    "expo": "pnpm --filter @workspace/focus-app exec expo"
+    "expo": "bash scripts/eas-expo.sh"
   },
   "private": true,
   "packageManager": "pnpm@10.26.1",
