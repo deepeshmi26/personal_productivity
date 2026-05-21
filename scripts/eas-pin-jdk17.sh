@@ -110,9 +110,24 @@ if [ -z "$JDK17_PATH" ] && [ -s /tmp/javac-binaries.txt ]; then
 fi
 
 echo ""
+# Strategy 5 (guaranteed fallback): download a portable Temurin 17 JDK.
 if [ -z "$JDK17_PATH" ]; then
-  echo "FATAL: Could not locate JDK 17 anywhere on this image."
-  echo "Review the diagnostics above and update scripts/eas-pin-jdk17.sh accordingly."
+  echo "No JDK 17 found on system. Downloading portable Temurin 17..."
+  DOWNLOAD_DIR="${EAS_BUILD_WORKINGDIR:-/tmp}/jdk17"
+  mkdir -p "$DOWNLOAD_DIR"
+  cd "$DOWNLOAD_DIR"
+  if [ ! -d jdk-17.0.13+11 ]; then
+    TEMURIN_URL="https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.13%2B11/OpenJDK17U-jdk_x64_linux_hotspot_17.0.13_11.tar.gz"
+    curl -fsSL "$TEMURIN_URL" -o jdk17.tar.gz
+    tar -xzf jdk17.tar.gz
+    rm -f jdk17.tar.gz
+  fi
+  cd - > /dev/null
+  choose_jdk17 "$DOWNLOAD_DIR/jdk-17.0.13+11" && echo "Downloaded JDK 17 to: $JDK17_PATH"
+fi
+
+if [ -z "$JDK17_PATH" ]; then
+  echo "FATAL: Could not locate or download JDK 17."
   exit 1
 fi
 
