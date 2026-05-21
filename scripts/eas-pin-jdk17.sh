@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# Runs on the EAS Build worker after dependencies are installed but before
+# gradle invokes the Android build. Finds JDK 17 on the machine and pins it
+# in android/gradle.properties so gradle ignores any Java 11 default.
+#
+# Also dumps extensive diagnostics so that if detection ever fails, the next
+# build log will tell us exactly what's on the image.
+set -uo pipefail
+
+echo ""
+echo "============================================================"
+echo "=== eas-pin-jdk17: JDK environment diagnostics"
+echo "============================================================"
+echo "PWD: $(pwd)"
+echo "USER: ${USER:-unknown}  HOME: ${HOME:-unknown}"
+echo ""
+echo "--- env vars ---"
+echo "JAVA_HOME=${JAVA_HOME:-<unset>}"
+echo "PATH=${PATH:-<unset>}"
+echo ""
+echo "--- which java / java -version ---"
+which java 2>&1 || echo "  no java on PATH"
+java -version 2>&1 || true
+echo ""
+echo "--- /usr/lib/jvm ---"
+ls -la /usr/lib/jvm 2>&1 || echo "  (missing)"
+echo ""
+echo "--- /opt ---"
+ls -la /opt 2>&1 | head -40 || true
+echo ""
+echo "--- update-alternatives java ---"
+update-alternatives --list java 2>&1 || true
+update-alternatives --list javac 2>&1 || true
+echo ""
+echo "--- update-java-alternatives -l ---"
+update-java-alternatives -l 2>&1 || true
+echo ""
+if [ -n "${HOME:-}" ]; then
+  echo "--- $HOME (depth 1) ---"
+  ls -la "$HOME" 2>&1 | head -40 || true
+  if [ -d "$HOME/.sdkman/candidates/java" ]; then
+    echo "--- $HOME/.sdkman/candidates/java ---"
+    ls -la "$HOME/.sdkman/candidates/java" 2>&1 || true
+  fi
+  if [ -d "$HOME/.gradle/jdks" ]; then
+    echo "--- $HOME/.gradle/jdks ---"
+    ls -la "$HOME/.gradle/jdks" 2>&1 || true
+  fi
+fi
+echo ""
+echo "--- exhaustive search for javac binaries ---"
+# Search common roots, limit depth to keep it fast, ignore permission errors.
+SEARCH_ROOTS=(/usr/lib/jvm /usr/java /opt /home /root)
+for root in "${SEARCH_ROOTS[@]}"; do
+  [ -d "$root" ] || continue
+  find "$root" -maxdepth 6 -type f -name javac 2>/dev/null
+done | sort -u | tee /tmp/javac-binaries.txt
+echo ""
+
+echo "============================================================"
+echo "=== eas-pin-jdk17: choose JDK 17"
+echo "============================================================"
+
+JDK17_PATH=""
+choose_jdk17() {
+  local jhome="$1"
+  [ -z "$jhome" ] && return 1
+  [ -x "$jhome/bin/javac" ] || return 1
+  local ver
+  ver=$("$jhome/bin/javac" -version 2>&1 | awk '{print $2}' | cut -d. -f1)
+  if [ "$ver" = "17" ]; then
+    JDK17_PATH="$jhome"
+    return 0
+  fi
+  return 1
+}
+
+# Strategy 1: respect JAVA_HOME if it points at JDK 17
+choose_jdk17 "${JAVA_HOME:-}" && echo "Selected via JAVA_HOME: $JDK17_PATH"
+
+# Strategy 2: known paths
+if [ -z "$JDK17_PATH" ]; then
+  for candidate in \
+    /usr/lib/jvm/java-17-openjdk-amd64 \
+    /usr/lib/jvm/java-1.17.0-openjdk-amd64 \
+    /usr/lib/jvm/temurin-17-jdk-amd64 \
+    /usr/lib/jvm/zulu17-ca-amd64 \
+    /usr/lib/jvm/zulu-17-amd64 \
+    /opt/java/openjdk \
+    /opt/jdk-17 \
+    /opt/openjdk-17 \
+    /opt/temurin-17; do
+    choose_jdk17 "$candidate" && { echo "Selected via known path: $JDK17_PATH"; break; }
+  done
+fi
+
+# Strategy 3: glob common dirs for *17*
+if [ -z "$JDK17_PATH" ]; then
+  for candidate in /usr/lib/jvm/*17* /opt/*17* /opt/java/*17* "${HOME:-/nonexistent}"/.sdkman/candidates/java/17* "${HOME:-/nonexistent}"/.gradle/jdks/*17*; do
+    choose_jdk17 "$candidate" && { echo "Selected via glob: $JDK17_PATH"; break; }
+  done
+fi
+
+# Strategy 4: walk every javac we found and ask its version
+if [ -z "$JDK17_PATH" ] && [ -s /tmp/javac-binaries.txt ]; then
+  while IFS= read -r javac_bin; do
+    jhome="${javac_bin%/bin/javac}"
+    choose_jdk17 "$jhome" && { echo "Selected via javac scan: $JDK17_PATH"; break; }
+  done < /tmp/javac-binaries.txt
+fi
+
+echo ""
+if [ -z "$JDK17_PATH" ]; then
+  echo "FATAL: Could not locate JDK 17 anywhere on this image."
+  echo "Review the diagnostics above and update scripts/eas-pin-jdk17.sh accordingly."
+  exit 1
+fi
+
+echo "Using JDK 17: $JDK17_PATH"
+"$JDK17_PATH/bin/javac" -version 2>&1 || true
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+APP_DIR="$REPO_ROOT/artifacts/focus-app"
+GRADLE_PROPS="$APP_DIR/android/gradle.properties"
+
+if [ ! -f "$GRADLE_PROPS" ]; then
+  echo "WARNING: $GRADLE_PROPS not found yet (prebuild may not have run). Skipping pin."
+  exit 0
+fi
+
+# Remove any prior pin and write a fresh one
+if grep -q "^org.gradle.java.home=" "$GRADLE_PROPS"; then
+  sed -i.bak '/^org.gradle.java.home=/d' "$GRADLE_PROPS" && rm -f "$GRADLE_PROPS.bak"
+fi
+echo "" >> "$GRADLE_PROPS"
+echo "org.gradle.java.home=$JDK17_PATH" >> "$GRADLE_PROPS"
+echo "Pinned org.gradle.java.home=$JDK17_PATH in $GRADLE_PROPS"
+echo "============================================================"

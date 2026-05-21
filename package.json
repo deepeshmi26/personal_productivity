@@ -8,6 +8,7 @@
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
     "eas-build-pre-install": "echo '=== EAS pre-install hook ===' && echo \"Node: $(node --version)\" && echo \"Initial pnpm: $(pnpm --version 2>/dev/null || echo none)\" && npm install -g pnpm@10.26.1 --force && echo \"Final pnpm: $(pnpm --version)\" && echo \"pnpm path: $(which pnpm)\"",
+    "eas-build-post-install": "bash scripts/eas-pin-jdk17.sh || true",
     "expo": "bash scripts/eas-expo.sh"
   },
   "private": true,
