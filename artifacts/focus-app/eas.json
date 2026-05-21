@@ -7,7 +7,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "image": "latest",
+      "image": "ubuntu-22.04-jdk-17-ndk-r26b",
       "node": "22.14.0",
       "android": {
         "buildType": "apk"
@@ -16,7 +16,7 @@
     "preview": {
       "distribution": "internal",
       "channel": "preview",
-      "image": "latest",
+      "image": "ubuntu-22.04-jdk-17-ndk-r26b",
       "node": "22.14.0",
       "android": {
         "buildType": "apk"
@@ -25,7 +25,7 @@
     "production": {
       "channel": "production",
       "autoIncrement": true,
-      "image": "latest",
+      "image": "ubuntu-22.04-jdk-17-ndk-r26b",
       "node": "22.14.0",
       "android": {
         "buildType": "app-bundle"
