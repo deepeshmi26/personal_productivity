@@ -9,15 +9,28 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { useColors } from "@/hooks/useColors";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { NetworkUnreachableOverlay } from "@/components/NetworkUnreachableOverlay";
+import { isSettingsResponse } from "@/lib/api-health";
 import type { QuietHoursConfig } from "@/lib/scheduling";
+
+const DEFAULT_SETTINGS = {
+  reminderIntervalMinutes: 5,
+  quietHoursEnabled: false,
+  quietHoursStart: "22:00",
+  quietHoursEnd: "07:00",
+};
 
 export function SettingsBootstrap({ children }: { children: React.ReactNode }) {
   const colors = useColors();
-  const { data, isLoading } = useGetSettings();
+  const { data, isLoading, isError, isFetched } = useGetSettings();
   const queryClient = useQueryClient();
   const updateMutation = useUpdateSettings();
 
-  if (isLoading || !data) {
+  const hasValidSettings = isSettingsResponse(data);
+  const apiUnreachable =
+    isError || (isFetched && !isLoading && !hasValidSettings);
+
+  if (isLoading && !isFetched) {
     return (
       <View
         style={[styles.loading, { backgroundColor: colors.background }]}
@@ -26,6 +39,8 @@ export function SettingsBootstrap({ children }: { children: React.ReactNode }) {
       </View>
     );
   }
+
+  const settings = hasValidSettings ? data : DEFAULT_SETTINGS;
 
   const onIntervalChange = async (minutes: number) => {
     await updateMutation.mutateAsync({
@@ -46,19 +61,21 @@ export function SettingsBootstrap({ children }: { children: React.ReactNode }) {
   };
 
   const quietHours: QuietHoursConfig = {
-    enabled: data.quietHoursEnabled,
-    start: data.quietHoursStart,
-    end: data.quietHoursEnd,
+    enabled: settings.quietHoursEnabled,
+    start: settings.quietHoursStart,
+    end: settings.quietHoursEnd,
   };
 
   return (
     <NotificationProvider
-      intervalMinutes={data.reminderIntervalMinutes}
+      intervalMinutes={settings.reminderIntervalMinutes}
       quietHours={quietHours}
       onIntervalChange={onIntervalChange}
       onQuietHoursChange={onQuietHoursChange}
     >
-      {children}
+      <View style={styles.shell}>
+        {apiUnreachable ? <NetworkUnreachableOverlay /> : children}
+      </View>
     </NotificationProvider>
   );
 }
@@ -68,5 +85,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  shell: {
+    flex: 1,
   },
 });
