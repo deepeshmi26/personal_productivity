@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: learn5-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: learn5
+    volumes:
+      - learn5_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d learn5"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  learn5_pg_data:

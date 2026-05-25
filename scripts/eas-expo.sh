@@ -10,6 +10,20 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP_DIR="$REPO_ROOT/artifacts/focus-app"
 
+# Expo inlines EXPO_PUBLIC_* at Metro startup. Load monorepo root + app env files.
+load_env_file() {
+  local file="$1"
+  if [ -f "$file" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    . "$file"
+    set +a
+  fi
+}
+
+load_env_file "$REPO_ROOT/.env"
+load_env_file "$APP_DIR/.env"
+
 cd "$REPO_ROOT"
 pnpm --filter @workspace/focus-app exec expo "$@"
 

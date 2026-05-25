@@ -4,7 +4,12 @@ import { Feather } from "@expo/vector-icons";
 
 import { useColors } from "@/hooks/useColors";
 
-export function NetworkUnreachableOverlay() {
+type Props = {
+  apiBaseUrl: string | null;
+  errorMessage?: string;
+};
+
+export function NetworkUnreachableOverlay({ apiBaseUrl, errorMessage }: Props) {
   const colors = useColors();
 
   return (
@@ -13,6 +18,29 @@ export function NetworkUnreachableOverlay() {
       <Text style={[styles.title, { color: colors.foreground }]}>
         Network not reachable
       </Text>
+      {__DEV__ ? (
+        <View style={styles.details}>
+          <Text style={[styles.detail, { color: colors.mutedForeground }]}>
+            API: {apiBaseUrl ?? "(not set — add EXPO_PUBLIC_API_URL)"}
+          </Text>
+          {errorMessage ? (
+            <Text style={[styles.detail, { color: colors.mutedForeground }]}>
+              {errorMessage}
+            </Text>
+          ) : null}
+          {!apiBaseUrl ? (
+            <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+              Set EXPO_PUBLIC_API_URL in artifacts/focus-app/.env, then restart
+              Metro (pnpm expo start --lan).
+            </Text>
+          ) : (
+            <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+              HTTP to a local IP requires an Android rebuild with
+              usesCleartextTraffic, or use adb reverse + localhost.
+            </Text>
+          )}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -29,6 +57,21 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 18,
     letterSpacing: -0.3,
+    textAlign: "center",
+  },
+  details: {
+    gap: 8,
+    maxWidth: 320,
+  },
+  detail: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    textAlign: "center",
+  },
+  hint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
     textAlign: "center",
   },
 });

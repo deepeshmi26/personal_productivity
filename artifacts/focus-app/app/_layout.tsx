@@ -16,8 +16,9 @@ import { setBaseUrl } from "@workspace/api-client-react";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SettingsBootstrap } from "@/components/SettingsBootstrap";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
-setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
+setBaseUrl(resolveApiBaseUrl());
 
 SplashScreen.preventAutoHideAsync();
 

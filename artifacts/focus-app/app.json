@@ -34,6 +34,7 @@
     },
     "android": {
       "package": "com.learn5.app",
+      "usesCleartextTraffic": true,
       "permissions": [
         "SCHEDULE_EXACT_ALARM",
         "POST_NOTIFICATIONS",

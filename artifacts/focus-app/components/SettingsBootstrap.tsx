@@ -4,6 +4,7 @@ import {
   useGetSettings,
   useUpdateSettings,
   getGetSettingsQueryKey,
+  getBaseUrl,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -22,7 +23,7 @@ const DEFAULT_SETTINGS = {
 
 export function SettingsBootstrap({ children }: { children: React.ReactNode }) {
   const colors = useColors();
-  const { data, isLoading, isError, isFetched } = useGetSettings();
+  const { data, isLoading, isError, isFetched, error } = useGetSettings();
   const queryClient = useQueryClient();
   const updateMutation = useUpdateSettings();
 
@@ -74,7 +75,14 @@ export function SettingsBootstrap({ children }: { children: React.ReactNode }) {
       onQuietHoursChange={onQuietHoursChange}
     >
       <View style={styles.shell}>
-        {apiUnreachable ? <NetworkUnreachableOverlay /> : children}
+        {apiUnreachable ? (
+          <NetworkUnreachableOverlay
+            apiBaseUrl={getBaseUrl()}
+            errorMessage={error instanceof Error ? error.message : undefined}
+          />
+        ) : (
+          children
+        )}
       </View>
     </NotificationProvider>
   );
