@@ -138,7 +138,8 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP_DIR="$REPO_ROOT/artifacts/focus-app"
 
 # Java 8+ removed PermGen; MaxPermSize crashes JDK 17 (common on older EAS Gradle defaults).
-GRADLE_JVMARGS="-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
+GRADLE_JVMARGS="-Xmx4g -XX:MaxMetaspaceSize=1536m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
+KOTLIN_DAEMON_JVMARGS="-Xmx2g -XX:MaxMetaspaceSize=1024m"
 
 patch_gradle_properties() {
   local file="$1"
@@ -152,12 +153,16 @@ patch_gradle_properties() {
   if grep -q "^org.gradle.jvmargs=" "$file"; then
     sed -i.bak '/^org.gradle.jvmargs=/d' "$file" && rm -f "$file.bak"
   fi
+  if grep -q "^kotlin.daemon.jvmargs=" "$file"; then
+    sed -i.bak '/^kotlin.daemon.jvmargs=/d' "$file" && rm -f "$file.bak"
+  fi
   # Strip legacy PermGen flags if they appear on other lines.
   sed -i.bak '/MaxPermSize/d' "$file" && rm -f "$file.bak"
 
   {
     echo ""
     echo "org.gradle.jvmargs=$GRADLE_JVMARGS"
+    echo "kotlin.daemon.jvmargs=$KOTLIN_DAEMON_JVMARGS"
     echo "org.gradle.java.home=$JDK17_PATH"
   } >> "$file"
 }

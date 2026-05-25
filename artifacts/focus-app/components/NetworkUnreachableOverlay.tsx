@@ -18,16 +18,22 @@ export function NetworkUnreachableOverlay({ apiBaseUrl, errorMessage }: Props) {
       <Text style={[styles.title, { color: colors.foreground }]}>
         Network not reachable
       </Text>
+      {apiBaseUrl ? (
+        <Text style={[styles.detail, { color: colors.mutedForeground }]}>
+          API: {apiBaseUrl}
+        </Text>
+      ) : (
+        <Text style={[styles.detail, { color: colors.mutedForeground }]}>
+          API: (not set)
+        </Text>
+      )}
+      {errorMessage ? (
+        <Text style={[styles.detail, { color: colors.mutedForeground }]}>
+          {errorMessage}
+        </Text>
+      ) : null}
       {__DEV__ ? (
         <View style={styles.details}>
-          <Text style={[styles.detail, { color: colors.mutedForeground }]}>
-            API: {apiBaseUrl ?? "(not set — add EXPO_PUBLIC_API_URL)"}
-          </Text>
-          {errorMessage ? (
-            <Text style={[styles.detail, { color: colors.mutedForeground }]}>
-              {errorMessage}
-            </Text>
-          ) : null}
           {!apiBaseUrl ? (
             <Text style={[styles.hint, { color: colors.mutedForeground }]}>
               Set EXPO_PUBLIC_API_URL in artifacts/focus-app/.env, then restart
@@ -35,8 +41,7 @@ export function NetworkUnreachableOverlay({ apiBaseUrl, errorMessage }: Props) {
             </Text>
           ) : (
             <Text style={[styles.hint, { color: colors.mutedForeground }]}>
-              HTTP to a local IP requires an Android rebuild with
-              usesCleartextTraffic, or use adb reverse + localhost.
+              On phone browser, open {apiBaseUrl}/api/settings to test reachability.
             </Text>
           )}
         </View>
