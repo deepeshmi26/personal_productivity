@@ -136,18 +136,60 @@ echo "Using JDK 17: $JDK17_PATH"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP_DIR="$REPO_ROOT/artifacts/focus-app"
-GRADLE_PROPS="$APP_DIR/android/gradle.properties"
 
-if [ ! -f "$GRADLE_PROPS" ]; then
-  echo "WARNING: $GRADLE_PROPS not found yet (prebuild may not have run). Skipping pin."
+# Java 8+ removed PermGen; MaxPermSize crashes JDK 17 (common on older EAS Gradle defaults).
+GRADLE_JVMARGS="-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
+
+patch_gradle_properties() {
+  local file="$1"
+  [ -f "$file" ] || return 0
+
+  echo "Patching $file"
+
+  if grep -q "^org.gradle.java.home=" "$file"; then
+    sed -i.bak '/^org.gradle.java.home=/d' "$file" && rm -f "$file.bak"
+  fi
+  if grep -q "^org.gradle.jvmargs=" "$file"; then
+    sed -i.bak '/^org.gradle.jvmargs=/d' "$file" && rm -f "$file.bak"
+  fi
+  # Strip legacy PermGen flags if they appear on other lines.
+  sed -i.bak '/MaxPermSize/d' "$file" && rm -f "$file.bak"
+
+  {
+    echo ""
+    echo "org.gradle.jvmargs=$GRADLE_JVMARGS"
+    echo "org.gradle.java.home=$JDK17_PATH"
+  } >> "$file"
+}
+
+# EAS may run Gradle from repo-root android/ (symlink) or artifacts/focus-app/android/.
+declare -a GRADLE_PROPS_PATHS=()
+for candidate in "$REPO_ROOT/android/gradle.properties" "$APP_DIR/android/gradle.properties"; do
+  if [ -f "$candidate" ]; then
+    resolved="$(cd "$(dirname "$candidate")" && pwd)/$(basename "$candidate")"
+    GRADLE_PROPS_PATHS+=("$resolved")
+  fi
+done
+
+if [ "${#GRADLE_PROPS_PATHS[@]}" -eq 0 ]; then
+  echo "WARNING: android/gradle.properties not found yet (prebuild may not have run). Skipping pin."
   exit 0
 fi
 
-# Remove any prior pin and write a fresh one
-if grep -q "^org.gradle.java.home=" "$GRADLE_PROPS"; then
-  sed -i.bak '/^org.gradle.java.home=/d' "$GRADLE_PROPS" && rm -f "$GRADLE_PROPS.bak"
+# Deduplicate (root android/ is often a symlink to focus-app/android/).
+UNIQUE_PROPS="$(printf '%s\n' "${GRADLE_PROPS_PATHS[@]}" | sort -u)"
+while IFS= read -r props; do
+  [ -n "$props" ] || continue
+  patch_gradle_properties "$props"
+  echo "Pinned JDK 17 + jvmargs in $props"
+done <<EOF
+$UNIQUE_PROPS
+EOF
+
+# EAS worker global Gradle config sometimes injects MaxPermSize.
+if [ -f "${HOME:-}/.gradle/gradle.properties" ]; then
+  sed -i.bak '/MaxPermSize/d' "${HOME}/.gradle/gradle.properties" && rm -f "${HOME}/.gradle/gradle.properties.bak"
+  echo "Stripped MaxPermSize from ~/.gradle/gradle.properties (if present)"
 fi
-echo "" >> "$GRADLE_PROPS"
-echo "org.gradle.java.home=$JDK17_PATH" >> "$GRADLE_PROPS"
-echo "Pinned org.gradle.java.home=$JDK17_PATH in $GRADLE_PROPS"
+
 echo "============================================================"
