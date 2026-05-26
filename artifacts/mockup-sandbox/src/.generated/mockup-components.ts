@@ -3,5 +3,10 @@ type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 export const modules: ModuleMap = {
   "./components/mockups/journal/DarkGrid.tsx": () => import("../components/mockups/journal/DarkGrid.tsx"),
   "./components/mockups/journal/TimelineStream.tsx": () => import("../components/mockups/journal/TimelineStream.tsx"),
-  "./components/mockups/journal/WarmEditorial.tsx": () => import("../components/mockups/journal/WarmEditorial.tsx")
+  "./components/mockups/journal/WarmEditorial.tsx": () => import("../components/mockups/journal/WarmEditorial.tsx"),
+  "./components/mockups/threads/NoiseFiltering.tsx": () => import("../components/mockups/threads/NoiseFiltering.tsx"),
+  "./components/mockups/threads/Overview.tsx": () => import("../components/mockups/threads/Overview.tsx"),
+  "./components/mockups/threads/ThreadDigest.tsx": () => import("../components/mockups/threads/ThreadDigest.tsx"),
+  "./components/mockups/threads/ThreadList.tsx": () => import("../components/mockups/threads/ThreadList.tsx"),
+  "./components/mockups/threads/ThreadQuiz.tsx": () => import("../components/mockups/threads/ThreadQuiz.tsx")
 };
