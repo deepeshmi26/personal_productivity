@@ -44,6 +44,32 @@ export const CreateResponseBody = zod.object({
 });
 
 /**
+ * @summary Updates the existing journal entry
+ */
+export const UpdateResponseParams = zod.object({
+  responseId: zod.coerce.number(),
+});
+
+export const UpdateResponseBody = zod.object({
+  text: zod.string(),
+});
+
+export const UpdateResponseResponse = zod.object({
+  id: zod.number(),
+  text: zod
+    .string()
+    .describe("The user's response text, or empty string if \"I don't know\""),
+  skipped: zod.boolean().describe('True if the user tapped \"I don\'t know\"'),
+  createdAt: zod.coerce.date(),
+  question: zod
+    .string()
+    .optional()
+    .describe(
+      "AI-generated quiz question for this entry, or empty string if not yet generated",
+    ),
+});
+
+/**
  * Returns a daily breakdown of how many responses were captured
  * @summary Get response statistics
  */

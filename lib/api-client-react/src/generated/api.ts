@@ -19,10 +19,12 @@ import type {
 import type {
   CardReviewRequest,
   CreateResponseRequest,
+  ErrorResponse,
   HealthStatus,
   LearningResponse,
   ResponseStats,
   Settings,
+  UpdateResponseRequest,
   UpdateSettingsRequest,
 } from "./api.schemas";
 
@@ -271,6 +273,93 @@ export const useCreateResponse = <
   TContext
 > => {
   return useMutation(getCreateResponseMutationOptions(options));
+};
+
+/**
+ * @summary Updates the existing journal entry
+ */
+export const getUpdateResponseUrl = (responseId: number) => {
+  return `/api/responses/${responseId}`;
+};
+
+export const updateResponse = async (
+  responseId: number,
+  updateResponseRequest: UpdateResponseRequest,
+  options?: RequestInit,
+): Promise<LearningResponse> => {
+  return customFetch<LearningResponse>(getUpdateResponseUrl(responseId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateResponseRequest),
+  });
+};
+
+export const getUpdateResponseMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateResponse>>,
+    TError,
+    { responseId: number; data: BodyType<UpdateResponseRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateResponse>>,
+  TError,
+  { responseId: number; data: BodyType<UpdateResponseRequest> },
+  TContext
+> => {
+  const mutationKey = ["updateResponse"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateResponse>>,
+    { responseId: number; data: BodyType<UpdateResponseRequest> }
+  > = (props) => {
+    const { responseId, data } = props ?? {};
+
+    return updateResponse(responseId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateResponseMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateResponse>>
+>;
+export type UpdateResponseMutationBody = BodyType<UpdateResponseRequest>;
+export type UpdateResponseMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Updates the existing journal entry
+ */
+export const useUpdateResponse = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateResponse>>,
+    TError,
+    { responseId: number; data: BodyType<UpdateResponseRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateResponse>>,
+  TError,
+  { responseId: number; data: BodyType<UpdateResponseRequest> },
+  TContext
+> => {
+  return useMutation(getUpdateResponseMutationOptions(options));
 };
 
 /**

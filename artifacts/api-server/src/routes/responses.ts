@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
 import { db, responsesTable } from "@workspace/db";
-import { desc, sql } from "drizzle-orm";
-import { CreateResponseBody } from "@workspace/api-zod";
+import { desc, sql, eq } from "drizzle-orm";
+import { CreateResponseBody, UpdateResponseBody } from "@workspace/api-zod";
+import { InvalidRequestError, ResourceNotFoundError } from "../errors";
 
 const router: IRouter = Router();
 
@@ -23,8 +24,7 @@ router.get("/responses", async (_req, res) => {
 router.post("/responses", async (req, res) => {
   const parsed = CreateResponseBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid body" });
-    return;
+    throw new InvalidRequestError("Invalid body");
   }
   const [row] = await db
     .insert(responsesTable)
@@ -33,10 +33,7 @@ router.post("/responses", async (req, res) => {
       skipped: parsed.data.skipped,
     })
     .returning();
-  if (!row) {
-    res.status(500).json({ error: "Insert failed" });
-    return;
-  }
+
   res.status(201).json({
     id: row.id,
     text: row.text,
@@ -45,6 +42,33 @@ router.post("/responses", async (req, res) => {
   });
 });
 
+router.patch("/responses/:responseId", async (req, res) => {
+  const responseId = parseInt(req.params["responseId"] ?? "", 10);
+  if (isNaN(responseId)) {
+    throw new InvalidRequestError("The url does not contain the response id");
+  }
+
+  const parsed = UpdateResponseBody.safeParse(req.body);
+  if (!parsed.success) {
+    throw new InvalidRequestError("Invalid body");
+  }
+
+  const text = parsed.data.text;
+
+
+  const [row] = await db.update(responsesTable).set({ text: text }).where(eq(responsesTable.id, responseId)).returning()
+
+  if (!row) {
+    throw new ResourceNotFoundError("The requested response id was not found");
+  }
+
+  res.status(200).json({
+    id: row.id,
+    text: row.text,
+    skipped: row.skipped,
+    createdAt: row.createdAt.toISOString(),
+  });
+})
 router.get("/responses/stats", async (_req, res) => {
   const totals = await db
     .select({

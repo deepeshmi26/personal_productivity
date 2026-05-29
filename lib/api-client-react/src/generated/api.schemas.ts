@@ -25,6 +25,10 @@ export interface CreateResponseRequest {
   skipped: boolean;
 }
 
+export interface UpdateResponseRequest {
+  text: string;
+}
+
 export type ResponseStatsDaysItem = {
   /** ISO date (YYYY-MM-DD) */
   date: string;
@@ -80,4 +84,8 @@ export interface UpdateSettingsRequest {
   quietHoursStart?: string;
   /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
   quietHoursEnd?: string;
+}
+
+export interface ErrorResponse {
+  message: string;
 }

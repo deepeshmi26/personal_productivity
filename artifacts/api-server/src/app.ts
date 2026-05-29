@@ -3,6 +3,8 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import errorHandler from "./middlewares/errorHandler";
+import notFoundHandler from "./middlewares/notFoundHandler";
 
 const app: Express = express();
 
@@ -30,5 +32,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
-
+app.use(notFoundHandler);
+app.use(errorHandler);
 export default app;

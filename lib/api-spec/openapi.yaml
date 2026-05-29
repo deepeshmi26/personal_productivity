@@ -62,6 +62,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LearningResponse"
+  /responses/{responseId}:
+    patch: 
+      operationId: updateResponse
+      tags: [responses]
+      summary: Updates the existing journal entry
+      parameters:
+        - name: responseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content: 
+          application/json:
+            schema:
+               $ref: "#/components/schemas/UpdateResponseRequest"
+      responses:
+        "200":
+          description: Updated response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearningResponse"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Response not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /responses/stats:
     get:
       operationId: getResponseStats
@@ -182,6 +218,13 @@ components:
       required:
         - text
         - skipped
+    UpdateResponseRequest:
+      type: object
+      properties:
+        text:
+          type: string
+      required:
+        - text
     ResponseStats:
       type: object
       properties:
@@ -254,3 +297,10 @@ components:
         quietHoursEnd:
           type: string
           pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
