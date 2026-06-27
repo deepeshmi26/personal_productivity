@@ -6,10 +6,7 @@ import {
   cardQuestionsTable,
   cardSchedulesTable,
 } from "@workspace/db";
-import { eq, lte, gt, gte, and, inArray, isNull, sql } from "drizzle-orm";
-import { batchProcess } from "@workspace/integrations-openai-ai-server/batch";
-import { logger } from "../lib/logger";
-import type { openai as OpenAIInstance } from "@workspace/integrations-openai-ai-server";
+import { eq, lte, gt, gte, and, isNull, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -39,56 +36,6 @@ function dueDateStr(addDays: number): string {
   return d.toISOString().split("T")[0]!;
 }
 
-// ─── AI question generation ───────────────────────────────────────────────────
-const QUESTION_TIMEOUT_MS = 8000;
-
-type OpenAIClient = typeof OpenAIInstance;
-let _clientPromise: Promise<OpenAIClient | null> | null = null;
-
-function getOpenAIClientPromise(): Promise<OpenAIClient | null> {
-  if (!_clientPromise) {
-    _clientPromise = import("@workspace/integrations-openai-ai-server")
-      .then((m) => m.openai)
-      .catch((err: unknown) => {
-        logger.warn({ err }, "OpenAI client unavailable — AI questions disabled");
-        return null;
-      });
-  }
-  return _clientPromise;
-}
-
-async function generateQuestion(text: string): Promise<string> {
-  const client = await getOpenAIClientPromise();
-  if (!client) return "";
-
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(
-      () => reject(new Error("Question generation timed out")),
-      QUESTION_TIMEOUT_MS,
-    ),
-  );
-
-  const aiCall = client.chat.completions.create({
-    model: "gpt-5-mini",
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are a spaced-repetition quiz assistant. Given a learning note, write a single, concise quiz question (max 15 words) that tests whether the learner can recall the key insight. Return only the question, no explanation.",
-      },
-      { role: "user", content: text },
-    ],
-  });
-
-  const response = await Promise.race([aiCall, timeout]);
-  const choice = response.choices[0];
-  logger.debug(
-    { finishReason: choice?.finish_reason, content: choice?.message?.content },
-    "AI question response",
-  );
-  return choice?.message?.content?.trim() ?? "";
-}
-
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 router.get("/cards/session", async (_req, res) => {
@@ -105,9 +52,11 @@ router.get("/cards/session", async (_req, res) => {
       text: responsesTable.text,
       skipped: responsesTable.skipped,
       createdAt: responsesTable.createdAt,
+      question: cardQuestionsTable.question,
     })
     .from(cardSchedulesTable)
     .innerJoin(responsesTable, eq(cardSchedulesTable.responseId, responsesTable.id))
+    .innerJoin(cardQuestionsTable, eq(cardQuestionsTable.responseId, responsesTable.id))
     .where(
       and(
         eq(responsesTable.skipped, false),
@@ -123,9 +72,11 @@ router.get("/cards/session", async (_req, res) => {
       text: responsesTable.text,
       skipped: responsesTable.skipped,
       createdAt: responsesTable.createdAt,
+      question: cardQuestionsTable.question,
     })
     .from(responsesTable)
     .leftJoin(cardSchedulesTable, eq(responsesTable.id, cardSchedulesTable.responseId))
+    .innerJoin(cardQuestionsTable, eq(cardQuestionsTable.responseId, responsesTable.id))
     .where(
       and(
         eq(responsesTable.skipped, false),
@@ -141,9 +92,11 @@ router.get("/cards/session", async (_req, res) => {
       text: responsesTable.text,
       skipped: responsesTable.skipped,
       createdAt: responsesTable.createdAt,
+      question: cardQuestionsTable.question,
     })
     .from(cardSchedulesTable)
     .innerJoin(responsesTable, eq(cardSchedulesTable.responseId, responsesTable.id))
+    .innerJoin(cardQuestionsTable, eq(cardQuestionsTable.responseId, responsesTable.id))
     .where(
       and(
         eq(responsesTable.skipped, false),
@@ -164,58 +117,13 @@ router.get("/cards/session", async (_req, res) => {
     return;
   }
 
-  const sessionIds = session.map((r) => r.id);
-
-  // Attach only already-cached AI questions — respond immediately, don't block on AI
-  const cachedQuestions = await db
-    .select()
-    .from(cardQuestionsTable)
-    .where(inArray(cardQuestionsTable.responseId, sessionIds));
-
-  const questionMap = new Map<number, string>(
-    cachedQuestions.map((q) => [q.responseId, q.question]),
-  );
-
-  // Fire-and-forget: generate questions for uncached cards in the background.
-  // On the next session load they'll already be cached.
-  const uncached = session.filter((r) => !questionMap.has(r.id));
-  if (uncached.length > 0) {
-    void (async () => {
-      try {
-        const results = await batchProcess(
-          uncached,
-          async (card: { id: number; text: string; skipped: boolean; createdAt: Date }) => {
-            try {
-              const question = await generateQuestion(card.text);
-              if (!question) logger.warn({ responseId: card.id }, "AI returned empty question");
-              return question ? { responseId: card.id, question } : null;
-            } catch (err) {
-              logger.error({ responseId: card.id, err }, "Failed to generate question");
-              return null;
-            }
-          },
-          { concurrency: 2, retries: 3 },
-        );
-        const toInsert = results.filter(
-          (r): r is { responseId: number; question: string } => r !== null && !!r.question,
-        );
-        if (toInsert.length > 0) {
-          await db.insert(cardQuestionsTable).values(toInsert).onConflictDoNothing();
-          logger.info({ count: toInsert.length }, "Background: cached new AI questions");
-        }
-      } catch (err) {
-        logger.error({ err }, "Background question generation failed");
-      }
-    })();
-  }
-
   res.json(
     session.map((r) => ({
       id: r.id,
       text: r.text,
       skipped: r.skipped,
       createdAt: r.createdAt.toISOString(),
-      question: questionMap.get(r.id) ?? "",
+      question: r.question,
     })),
   );
 });

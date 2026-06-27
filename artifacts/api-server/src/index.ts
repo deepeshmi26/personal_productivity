@@ -1,4 +1,5 @@
 import app from "./app";
+import { runQuestionGenerator } from "./jobs/questionGenerationWorker";
 import { logger } from "./lib/logger";
 
 const rawPort = process.env["PORT"];
@@ -23,3 +24,14 @@ app.listen(port, "0.0.0.0", (err) => {
 
   logger.info({ port }, "Server listening");
 });
+
+
+void runQuestionGenerator().catch((err) => {
+  logger.error({ err }, "Question worker: initial batch failed");
+});
+
+setInterval(() => {
+  void runQuestionGenerator().catch((err) => {
+    logger.error({ err }, "Question worker: batch failed");
+  });
+}, 5000);

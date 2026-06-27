@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { integer, pgTable, serial, text, timestamp, unique } from "drizzle-orm/pg-core";
 import { responsesTable } from "./responses";
 
 export const cardQuestionsTable = pgTable(

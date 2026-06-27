@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, responsesTable } from "@workspace/db";
+import { db, questionGenerationJobsTable, responsesTable } from "@workspace/db";
 import { desc, sql, eq } from "drizzle-orm";
 import { CreateResponseBody, UpdateResponseBody } from "@workspace/api-zod";
 import { InvalidRequestError, ResourceNotFoundError } from "../errors";
@@ -26,13 +26,17 @@ router.post("/responses", async (req, res) => {
   if (!parsed.success) {
     throw new InvalidRequestError("Invalid body");
   }
-  const [row] = await db
-    .insert(responsesTable)
-    .values({
-      text: parsed.data.text,
-      skipped: parsed.data.skipped,
-    })
-    .returning();
+  const row = await db.transaction(async (tx) => {
+    const [response] = await tx
+      .insert(responsesTable)
+      .values({
+        text: parsed.data.text,
+        skipped: parsed.data.skipped,
+      })
+      .returning();
+    await tx.insert(questionGenerationJobsTable).values({ responseId: response.id })
+    return response;
+  })
 
   res.status(201).json({
     id: row.id,
