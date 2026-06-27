@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1782582716487,
+      "tag": "0000_blue_roland_deschain",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782585244875,
+      "tag": "0001_freezing_peter_parker",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782585505563,
+      "tag": "0002_slippery_master_mold",
+      "breakpoints": true
+    }
+  ]
+}

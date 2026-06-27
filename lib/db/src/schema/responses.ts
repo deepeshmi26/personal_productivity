@@ -6,6 +6,7 @@ export const responsesTable = pgTable("responses", {
   id: serial("id").primaryKey(),
   text: text("text").notNull().default(""),
   skipped: boolean("skipped").notNull().default(false),
+  isNoise: boolean("is_noise"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
