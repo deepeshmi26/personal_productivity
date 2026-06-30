@@ -1,0 +1,1 @@
+ALTER TABLE "threads" ADD CONSTRAINT "threads_label_unique" UNIQUE("label");

@@ -4,12 +4,11 @@ export const threadsTable = pgTable(
     "threads",
     {
         id: serial("id").primaryKey(),
-        label: text("label").notNull(),
+        label: text("label").notNull().unique(),
         labelLocked: boolean("label_locked").notNull().default(false),
         createdAt: timestamp("created_at", { withTimezone: true })
             .notNull()
             .defaultNow(),
-
     },
 )
 

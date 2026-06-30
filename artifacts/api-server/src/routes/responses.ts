@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, questionGenerationJobsTable, responsesTable } from "@workspace/db";
+import { db, responseProcessingJobsTable, responsesTable } from "@workspace/db";
 import { desc, sql, eq } from "drizzle-orm";
 import { CreateResponseBody, UpdateResponseBody } from "@workspace/api-zod";
 import { InvalidRequestError, ResourceNotFoundError } from "../errors";
@@ -34,7 +34,7 @@ router.post("/responses", async (req, res) => {
         skipped: parsed.data.skipped,
       })
       .returning();
-    await tx.insert(questionGenerationJobsTable).values({ responseId: response.id })
+    await tx.insert(responseProcessingJobsTable).values({ responseId: response.id })
     return response;
   })
 

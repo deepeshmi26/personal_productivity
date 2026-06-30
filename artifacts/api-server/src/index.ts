@@ -1,5 +1,5 @@
 import app from "./app";
-import { runQuestionGenerator } from "./jobs/questionGenerationWorker";
+import { runQuestionGenerator } from "./jobs/responseProcessingWorker";
 import { logger } from "./lib/logger";
 
 const rawPort = process.env["PORT"];

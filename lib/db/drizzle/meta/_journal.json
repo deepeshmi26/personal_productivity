@@ -22,6 +22,13 @@
       "when": 1782585505563,
       "tag": "0002_slippery_master_mold",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782707983141,
+      "tag": "0003_equal_pet_avengers",
+      "breakpoints": true
     }
   ]
 }
