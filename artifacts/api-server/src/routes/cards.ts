@@ -5,8 +5,9 @@ import {
   cardReviewsTable,
   cardQuestionsTable,
   cardSchedulesTable,
+  responseProcessingJobsTable,
 } from "@workspace/db";
-import { eq, lte, gt, gte, and, isNull, sql } from "drizzle-orm";
+import { eq, lte, desc, gt, gte, and, isNull, sql, inArray } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -105,6 +106,50 @@ router.get("/cards/session", async (_req, res) => {
       ),
     );
 
+  let highPriorityRows = await db
+    .select({ id: responseProcessingJobsTable.id })
+    .from(responseProcessingJobsTable)
+    .where(
+      and(
+        inArray(responseProcessingJobsTable.status, ["pending", "running"]),
+        eq(responseProcessingJobsTable.priority, 10)
+      )
+    )
+    .limit(10);
+
+  if (10 - highPriorityRows.length > 0) {
+    const rowsToBoost = await db
+      .select({ id: responseProcessingJobsTable.id })
+      .from(responseProcessingJobsTable)
+      .innerJoin(responsesTable, eq(responseProcessingJobsTable.responseId, responsesTable.id))
+      .leftJoin(cardQuestionsTable, eq(cardQuestionsTable.responseId, responsesTable.id))
+      .where(
+        and(
+          eq(responseProcessingJobsTable.status, "pending"),
+          eq(responsesTable.skipped, false),
+          isNull(cardQuestionsTable.id) // Only include responses where question hasn't been generated yet
+        )
+      )
+      .orderBy(desc(responseProcessingJobsTable.createdAt)) // latest to oldest
+      .limit(10 - highPriorityRows.length);
+
+
+
+    if (rowsToBoost.length > 0) {
+      await db
+        .update(responseProcessingJobsTable)
+        .set({ priority: 10 })
+        .where(
+          inArray(
+            responseProcessingJobsTable.id,
+            rowsToBoost.map((row) => row.id),
+          ),
+        );
+      highPriorityRows = highPriorityRows.concat(rowsToBoost);
+    }
+  }
+
+
   // Ordered: wrong → new (capped) → due correct (shuffled within each bucket)
   const session = [
     ...shuffle(wrongCards),
@@ -112,20 +157,16 @@ router.get("/cards/session", async (_req, res) => {
     ...shuffle(dueCorrectCards),
   ];
 
-  if (session.length === 0) {
-    res.json([]);
-    return;
-  }
-
-  res.json(
-    session.map((r) => ({
+  res.json({
+    cards: session.map((r) => ({
       id: r.id,
       text: r.text,
       skipped: r.skipped,
       createdAt: r.createdAt.toISOString(),
       question: r.question,
     })),
-  );
+    isProcessing: highPriorityRows.length > 0,
+  });
 });
 
 router.post("/cards/:responseId/review", async (req, res) => {

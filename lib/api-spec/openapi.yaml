@@ -152,9 +152,17 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/LearningResponse"
+                type: object
+                required:
+                  - cards
+                  - isProcessing
+                properties:
+                  cards:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LearningResponse"
+                  isProcessing:
+                    type: boolean
   /cards/{responseId}/review:
     post:
       operationId: reviewCard

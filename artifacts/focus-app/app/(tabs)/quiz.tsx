@@ -330,7 +330,8 @@ export default function QuizScreen() {
   const [remembered, setRemembered] = useState(0);
   const [forgot, setForgot] = useState(0);
 
-  const cards = (data ?? []).filter((c) => !c.skipped);
+  const cards = (data?.cards ?? []).filter((c) => !c.skipped);
+  const isProcessing = data?.isProcessing ?? false;
   const isDone = !isLoading && cards.length > 0 && currentIndex >= cards.length;
   const isEmpty = !isLoading && cards.length === 0;
   const topPad = Platform.OS === "web" ? 67 + 16 : insets.top + 8;
@@ -417,19 +418,20 @@ export default function QuizScreen() {
             style={[styles.emptyIcon, { backgroundColor: colors.accent }]}
           >
             <Feather
-              name="layers"
+              name={isProcessing ? "clock" : "layers"}
               size={28}
               color={colors.accentForeground}
             />
           </View>
           <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-            No entries to review
+            {isProcessing ? "Preparing your cards" : "No entries to review"}
           </Text>
           <Text
             style={[styles.emptyBody, { color: colors.mutedForeground }]}
           >
-            Capture a few things you've learned and they'll show up here for
-            review.
+            {isProcessing
+              ? "Your recent entries are being turned into quiz cards. Check back shortly."
+              : "Capture a few things you've learned and they'll show up here for review."}
           </Text>
         </View>
       ) : (

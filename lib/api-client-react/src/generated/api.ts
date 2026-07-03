@@ -20,6 +20,7 @@ import type {
   CardReviewRequest,
   CreateResponseRequest,
   ErrorResponse,
+  GetCardSession200,
   HealthStatus,
   LearningResponse,
   ResponseStats,
@@ -607,8 +608,8 @@ export const getGetCardSessionUrl = () => {
 
 export const getCardSession = async (
   options?: RequestInit,
-): Promise<LearningResponse[]> => {
-  return customFetch<LearningResponse[]>(getGetCardSessionUrl(), {
+): Promise<GetCardSession200> => {
+  return customFetch<GetCardSession200>(getGetCardSessionUrl(), {
     ...options,
     method: "GET",
   });

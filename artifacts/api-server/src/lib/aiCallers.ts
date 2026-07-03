@@ -18,6 +18,8 @@ function getOpenAIClientPromise(): Promise<OpenAIClient | null> {
   return clientPromise;
 }
 
+
+
 export async function generateQuestion(text: string): Promise<string> {
   const client = await getOpenAIClientPromise();
   if (!client) return "";
@@ -30,7 +32,7 @@ export async function generateQuestion(text: string): Promise<string> {
   );
 
   const aiCall = client.chat.completions.create({
-    model: "gpt-5-mini",
+    model: "gpt-4o-mini",
     messages: [
       {
         role: "system",
@@ -39,6 +41,7 @@ export async function generateQuestion(text: string): Promise<string> {
       },
       { role: "user", content: text },
     ],
+    max_tokens: 3
   });
 
   const response = await Promise.race([aiCall, timeout]);
@@ -62,7 +65,7 @@ export async function noiseClassifier(text: string): Promise<boolean> {
   );
 
   const aiCall = client.chat.completions.create({
-    model: "gpt-5-mini",
+    model: "gpt-4o-mini",
     messages: [
       {
         role: "system",
@@ -71,8 +74,7 @@ export async function noiseClassifier(text: string): Promise<boolean> {
       },
       { role: "user", content: text },
     ],
-    max_tokens: 3,
-    temperature: 0,
+    max_tokens: 3
   });
 
   const response = await Promise.race([aiCall, timeout]);
@@ -83,7 +85,7 @@ export async function noiseClassifier(text: string): Promise<boolean> {
     "AI noise classification response"
   );
 
-  return answer === "YES";
+  return answer === "NO";
 }
 
 export async function classifyThreadCategory(
@@ -108,7 +110,7 @@ export async function classifyThreadCategory(
   }
 
   const aiCall = client.chat.completions.create({
-    model: "gpt-5-mini",
+    model: "gpt-4o-mini",
     messages: [
       {
         role: "system",
@@ -117,7 +119,6 @@ export async function classifyThreadCategory(
       { role: "user", content: text },
     ],
     max_tokens: 30,
-    temperature: 0,
   });
 
   const response = await Promise.race([aiCall, timeout]);

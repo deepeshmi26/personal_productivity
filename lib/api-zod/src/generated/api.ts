@@ -171,21 +171,29 @@ export const UpdateSettingsResponse = zod.object({
  * Returns up to 10 non-skipped responses from the last 30 days, ordered forgot-first then never-reviewed then random
  * @summary Get cards for a quiz session
  */
-export const GetCardSessionResponseItem = zod.object({
-  id: zod.number(),
-  text: zod
-    .string()
-    .describe("The user's response text, or empty string if \"I don't know\""),
-  skipped: zod.boolean().describe('True if the user tapped \"I don\'t know\"'),
-  createdAt: zod.coerce.date(),
-  question: zod
-    .string()
-    .optional()
-    .describe(
-      "AI-generated quiz question for this entry, or empty string if not yet generated",
-    ),
+export const GetCardSessionResponse = zod.object({
+  cards: zod.array(
+    zod.object({
+      id: zod.number(),
+      text: zod
+        .string()
+        .describe(
+          "The user's response text, or empty string if \"I don't know\"",
+        ),
+      skipped: zod
+        .boolean()
+        .describe('True if the user tapped \"I don\'t know\"'),
+      createdAt: zod.coerce.date(),
+      question: zod
+        .string()
+        .optional()
+        .describe(
+          "AI-generated quiz question for this entry, or empty string if not yet generated",
+        ),
+    }),
+  ),
+  isProcessing: zod.boolean(),
 });
-export const GetCardSessionResponse = zod.array(GetCardSessionResponseItem);
 
 /**
  * @summary Record a card review result

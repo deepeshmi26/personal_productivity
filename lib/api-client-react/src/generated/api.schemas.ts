@@ -89,3 +89,8 @@ export interface UpdateSettingsRequest {
 export interface ErrorResponse {
   message: string;
 }
+
+export type GetCardSession200 = {
+  cards: LearningResponse[];
+  isProcessing: boolean;
+};

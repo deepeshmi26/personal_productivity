@@ -1,5 +1,5 @@
 import { cardQuestionsTable, db, responseProcessingJobsTable, responsesTable, responseThreadsTable, threadsTable } from "@workspace/db";
-import { and, eq, gte, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { classifyThreadCategory, generateQuestion, noiseClassifier } from "../lib/aiCallers";
 import { logger } from "../lib/logger";
 
@@ -26,6 +26,7 @@ async function recordJobFailure(
                 status: shouldRetry ? "pending" : "failed",
                 lastError: lastError.slice(0, 1000),
                 updatedAt: sql`NOW()`,
+                nextAttemptAt: shouldRetry ? new Date(Date.now() + Math.pow(2, job.attemptCount - 1) * 10 * 1000) : null,
             })
             .where(eq(responseProcessingJobsTable.id, job.id));
     } catch (markErr) {
@@ -64,15 +65,18 @@ async function recoverStaleRunningJobs() {
             .update(responseProcessingJobsTable)
             .set({
                 status: "pending",
-                lastError: "Worker stale: retrying job after 5 minutes",
+                lastError: "Worker stale: retrying job after exponential backoff",
                 updatedAt: sql`NOW()`,
+                nextAttemptAt: sql`NOW() + POWER(2, ${responseProcessingJobsTable.attemptCount}) * INTERVAL '10 seconds'`
             })
             .where(
                 and(
                     eq(responseProcessingJobsTable.status, "running"),
                     lt(responseProcessingJobsTable.updatedAt, cutoff),
+                    lt(responseProcessingJobsTable.attemptCount, MAX_ATTEMPTS),
                 ),
             );
+
     } catch (err) {
         logger.error({ err }, "Question worker: stale job recovery failed");
     }
@@ -215,10 +219,20 @@ export async function processOneResponseJob() {
             const [job] = await tx
                 .select()
                 .from(responseProcessingJobsTable)
-                .where(eq(responseProcessingJobsTable.status, "pending"))
-                .orderBy(responseProcessingJobsTable.createdAt)
+                .where(
+                    and(
+                        eq(responseProcessingJobsTable.status, "pending"),
+                        or(
+                            isNull(responseProcessingJobsTable.nextAttemptAt),
+                            lte(responseProcessingJobsTable.nextAttemptAt, sql`NOW()`)
+                        )
+                    )
+                )
+
+                .orderBy(desc(responseProcessingJobsTable.priority), responseProcessingJobsTable.createdAt)
                 .limit(1)
                 .for("update", { skipLocked: true });
+
 
             if (!job) return null;
 

@@ -21,8 +21,8 @@ load_env_file() {
   fi
 }
 
-load_env_file "$REPO_ROOT/.env"
 load_env_file "$APP_DIR/.env"
+load_env_file "$REPO_ROOT/.env"
 
 # Expo/Gradle Metro loads .env from the app package dir, not the monorepo root.
 # Mirror resolved EXPO_PUBLIC_* into artifacts/focus-app/.env for release embed.

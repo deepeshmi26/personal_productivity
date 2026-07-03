@@ -18,6 +18,12 @@ export const responseProcessingJobsTable = pgTable("response_processing_jobs", {
     status: responseProcessingJobStatusEnum("status").notNull().default("pending"),
     attemptCount: integer("attempt_count").notNull().default(0),
     lastError: text("last_error"),
+    priority: integer("priority").notNull().default(0),
+    // backfill: -10
+    // normal live response: 0
+    // session-needed recent response: 10
+    // manual repair: 50
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
         .notNull()

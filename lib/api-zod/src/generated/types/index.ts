@@ -10,6 +10,7 @@ export * from "./cardReviewRequest";
 export * from "./cardReviewRequestResult";
 export * from "./createResponseRequest";
 export * from "./errorResponse";
+export * from "./getCardSession200";
 export * from "./healthStatus";
 export * from "./learningResponse";
 export * from "./responseStats";
